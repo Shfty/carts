@@ -21,7 +21,7 @@ end
 -->8
 -- main
 
-draw_palfield = false
+draw_palfield = true
  
 function _init()
 	palt(1, false)
@@ -79,15 +79,14 @@ function draw_scan(y)
  		ctr += scrollx
  		ctr -= 64
  		ctr *= scale
- 		ctr += 0.5
- 		ctr += 64
- 		rectfill(
- 			ctr-ext_s,
- 			y,
- 			ctr+ext_s,
- 			y,
- 			i
- 		)
+ 		ctr += 64.5
+ 		
+   la = ctr-ext_s
+   lb = ctr+ext_s-1
+ 		
+ 		if la < 128 and lb >= 0 then
+ 			line(la,y,lb,y,i)
+ 		end
  	end
 	end
 end
