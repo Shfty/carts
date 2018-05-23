@@ -22,25 +22,30 @@ end
 -->8
 -- scaling
 
-rec = 1/128
+rec128 = 1/128
 
 function scale_linear(y)
-	return 2*(y-64)*rec
+	return 2*(y-64)*rec128
 end
 
 function scale_sine(y)
- local ly = y*rec
+ local ly = y*rec128
  ly -= 0.5
  ly = sin(ly*0.5)
  ly *= ly
- ly = max(ly, 0.125)
+ ly *= 0.8
+ ly += 0.2
 	return ly
 end
 -->8
 -- uvs
 
 function uv_linear(y)
- return flr((scrolly+y)/2)%8
+	local uvy = y+scrolly
+	uvy *= 0.5
+	uvy = flr(uvy)
+	uvy %= 8
+ return uvy
 end
 
 -->8
