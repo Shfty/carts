@@ -9,8 +9,12 @@ function rspr(idx,y)
 	end
 
 	local pix = {}
+	
+	local li = idx*4
+	local ly = y*64
+	ly += flr(idx/16)*64*7
 
-	local start = (idx*4)+(y*64)
+	local start = li+ly
 
 	for i=start,start+3 do
 	 local bc = peek(i)
