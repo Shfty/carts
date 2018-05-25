@@ -1,7 +1,8 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
--- globals 
+-- globals
+
 p_screen = 0x6000
 use_poke = false
 
@@ -13,7 +14,9 @@ use_poke = false
 	by poking values into
 	screen memory
 	
-	very fast
+	doesn't supprt draw state
+	calls such as pal and clip,
+	but is roughly 7.5x as fast
 ]]
 
 function pokeline(xa,xb,y,c)
