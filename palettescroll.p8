@@ -1,32 +1,72 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
+-- globals
+
+scrollx = 0
+scrolly = 0
+
+rec128 = 1/128
+
+-->8
 -- readsprite
 
+--[[
+	reads a line of pixel colors
+	from a given sprite and
+	returns them as a table
+]]
 function rspr(idx,y)
+	--[[
+		return black pixels
+		for sprite 0 to mimic
+		built-in drawing routines
+	]]
 	if idx == 0 then
 		return {0}
 	end
 
+	-- table to store pixel values
 	local pix = {}
 	
+	--[[
+		calculate sprite
+		memory address
+	]]
 	local li = idx*4
 	local ly = y*64
 	ly += flr(idx/16)*64*7
-
 	local start = li+ly
 
+	--[[
+		iterate through line
+		pixel pairs
+	]]
 	for i=start,start+3 do
+		-- read first pixel pair
 	 local bc = peek(i)
+	 
+	 --[[
+	 	extract left and
+	 	right pixels
+	 ]]
 		local b1 = flr(bc%16)
 		local b2 = flr(bc/16)
+		
+		-- add pixels to table
 		add(pix, b1)
 		add(pix, b2)
 	end
 	
+	-- return pixel table
 	return pix
 end
 
+--[[
+	reads a line of pixel colors
+	from a sprite in the map and
+	returns them as a table
+]]
 function rmap(x,y)
 	local idx = mget(x,y/8)
 	return rspr(idx,y%8)
@@ -34,7 +74,6 @@ end
 -->8
 -- scaling
 
-rec128 = 1/128
 
 function scale_linear(y)
 	return 2*(y-64)*rec128
@@ -72,43 +111,87 @@ function scanline(
 	f_uv,
 	uv_wrap
 )
+	-- variable defaults
 	local t_width = t_width or 8
  local y = y or 0
  local f_sc = f_sc or scale_linear
  local f_uv = f_uv or uv_linear
  local uv_wrap = uv_wrap or 8
  
+ -- calculate line scale
  local scale = f_sc(y)
+ 
+ --[[
+ 	only draw if the line
+ 	is visible
+ ]]
  if scale > 0 then
+ 	-- scaled sprite width
   local step = 8*scale
   
+  --[[
+  	unscaled line coords
+  	measured from -64..64
+  ]]
   local lb = (t_width*4)*scale
   local la = -lb
   
+  --[[
+  	transform to screenspace,
+  	apply scrolling and scale
+  ]]
   local la += 64+(scrollx*scale)
   local lb += 64+(scrollx*scale)
   
+  --[[
+  	lookup sprite texels
+  	for this line
+  ]]
+  local cs = ceil(t_width/8)
   local pixs = {}
-  add(pixs, rmap(0,f_uv(y,uv_wrap)))
-  add(pixs, rmap(1,f_uv(y,uv_wrap)))
-  add(pixs, rmap(2,f_uv(y,uv_wrap)))
+  for i = 0, cs-1 do
+  	add(
+  		pixs,
+  		rmap(i,f_uv(y,uv_wrap))
+  	)
+  end
+  
+  -- current texel index
   local i = 0
   
+  --[[
+  	iterate along the line
+  	texel-by-texel
+  ]]
   for x=la,lb-1,step do
+  	-- local line end
    local le = x+step
    
+   --[[
+   	only draw texel
+   	if it is visible
+   ]]
    if(x<128 and le>=0) then
    	local c = 0
    	if draw_pal then
+   		--[[
+   			visualize texels with
+   			colour field
+   		]]
    		c = i
    	else
+   		--[[
+   			lookup texel color
+   		]]
    		local pix = pixs[1+flr(i/8)]
    		c = pix[1+(i%#pix)]
    	end
    	
+   	-- draw the texel
    	rect(x+0.5,y,le-0.5,y,c)
    end
    
+   -- increment texel index
    i += 1
   end
 	end
@@ -117,14 +200,13 @@ end
 -->8
 -- main
 
-scrollx = 0
-scrolly = 0
-
 function _init()
+	-- play background music
 	music(0)
 end
 
 function _update60()
+	-- left / right scroll input
 	if btn(0) then
 	 scrollx += 1
 	end
@@ -133,17 +215,21 @@ function _update60()
 		scrollx -= 1
 	end
 	
+	-- toggle debug visualization
 	if btnp(4) then
 		draw_pal = not draw_pal
 	end
 	
+	-- integrate vertical scroll
 	scrolly = scrolly + 0.5
 end
 
 function _draw()
  cls()
  
+ -- iterate through screen rows
  for y=0,127 do
+ 	-- draw row
   scanline(
   	24,
    y,
@@ -152,8 +238,29 @@ function _draw()
    11*8
   )
  end
+ 
+ -- draw ui
+ rect(1,1,48,16,6)
+ rectfill(2,2,47,15,0)
+ 
+ fillp()
+ color(7)
+ print("cpu "..stat(1)*0.5,3,3)
+ print("fps "..stat(8),3,10)
 end
 
+-->8
+--[[
+todo
+
+screen-space/scale-space
+scrolling (per-line)
+
+vertical uv stretching
+
+horizontal uvs
+
+]]
 __gfx__
 00000000b7b7b7b74444444400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000003b3b3b3b4999999407777770070000700007700007777770077777700777777007777770077777700000000000000000000000000000000000000000
