@@ -6,7 +6,12 @@ __lua__
 scrollx = 0
 scrolly = 0
 
-rec128 = 1/128
+p_udata = 0x4300
+p_pixel = p_udata
+
+-- 134.1095%
+-- 132.6447%
+-- 103.3478%
 
 -->8
 -- readsprite
@@ -23,12 +28,14 @@ function rspr(idx,y)
 		built-in drawing routines
 	]]
 	if idx == 0 then
-		return {0}
+	 for i=0,7 do
+	 	poke(p_pixel, 0)
+	 	p_pixel += 1
+  end
+  
+  return
 	end
 
-	-- table to store pixel values
-	local pix = {}
-	
 	--[[
 		calculate sprite
 		memory address
@@ -43,7 +50,7 @@ function rspr(idx,y)
 		pixel pairs
 	]]
 	for i=start,start+3 do
-		-- read first pixel pair
+		-- read pixel pair
 	 local bc = peek(i)
 	 
 	 --[[
@@ -53,13 +60,12 @@ function rspr(idx,y)
 		local b1 = flr(bc%16)
 		local b2 = flr(bc/16)
 		
-		-- add pixels to table
-		add(pix, b1)
-		add(pix, b2)
+		-- poke pixels into userdata
+		poke(p_pixel, b1)
+		p_pixel += 1
+		poke(p_pixel, b2)
+		p_pixel += 1
 	end
-	
-	-- return pixel table
-	return pix
 end
 
 --[[
@@ -69,18 +75,17 @@ end
 ]]
 function rmap(x,y)
 	local idx = mget(x,y/8)
-	return rspr(idx,y%8)
+	rspr(idx,y%8)
 end
 -->8
 -- scaling
 
-
 function scale_linear(y)
-	return 2*(y-64)*rec128
+	return 2*(y-64)/128
 end
 
 function scale_sine(y)
- local ly = y*rec128
+ local ly = y/128
  ly -= 0.5
  ly = sin(ly*0.5)
  ly *= ly
@@ -93,7 +98,7 @@ end
 
 function uv_linear(y,wrap)
 	local uvy = y+scrolly
-	uvy *= 0.5
+	uvy /= 2
 	uvy = flr(uvy)
 	uvy %= wrap
  return uvy
@@ -140,20 +145,18 @@ function scanline(
   	transform to screenspace,
   	apply scrolling and scale
   ]]
-  local la += 64+(scrollx*scale)
-  local lb += 64+(scrollx*scale)
+  local sxs = scrollx*scale
+  local la += 64+sxs
+  local lb += 64+sxs
   
   --[[
   	lookup sprite texels
   	for this line
   ]]
   local cs = ceil(t_width/8)
-  local pixs = {}
+  p_pixel = p_udata
   for i = 0, cs-1 do
-  	add(
-  		pixs,
   		rmap(i,f_uv(y,uv_wrap))
-  	)
   end
   
   -- current texel index
@@ -183,8 +186,7 @@ function scanline(
    		--[[
    			lookup texel color
    		]]
-   		local pix = pixs[1+flr(i/8)]
-   		c = pix[1+(i%#pix)]
+   		c = peek(p_udata+i)
    	end
    	
    	-- draw the texel
@@ -221,32 +223,27 @@ function _update60()
 	end
 	
 	-- integrate vertical scroll
-	scrolly = scrolly + 0.5
+	--scrolly = scrolly + 0.5
 end
+
+xw = 16
+ys = 0
+ye = 127
 
 function _draw()
  cls()
  
  -- iterate through screen rows
- for y=0,127 do
+ for y=ys,ye do
  	-- draw row
   scanline(
-  	24,
+  	xw,
    y,
    scale_sine,
    uv_linear,
    11*8
   )
  end
- 
- -- draw ui
- rect(1,1,48,16,6)
- rectfill(2,2,47,15,0)
- 
- fillp()
- color(7)
- print("cpu "..stat(1)*0.5,3,3)
- print("fps "..stat(8),3,10)
 end
 
 -->8

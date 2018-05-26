@@ -3,11 +3,13 @@ version 16
 __lua__
 -- globals
 
-p_screen = 0x6000
 use_poke = false
 
 -->8
 -- pokeline
+
+p_screen = 0x6000
+rec16 = 1/16
 
 --[[
 	draws a horizontal line
@@ -20,23 +22,44 @@ use_poke = false
 ]]
 
 function pokeline(xa,xb,y,c)
+	--[[
+		calculate memory-space
+		line coordinates
+	]]
 	local lxa = flr(xa*0.5)
 	local lxb = flr(xb*0.5)
 	local ly = (y*64)
 	
+	--[[
+	 step along each memory cell
+	 of our line
+	]]
 	for i=lxa,lxb do
+		--[[
+			calculate this cell's
+			memory address
+		]]
 		local p_pix = p_screen+i+ly
 		
-		local lc = c%16+c*16
-		if i==lxa and xa%2==1 then
-			lp = peek(p_screen+i+ly)
+		-- 
+		local lb = i==lxa and xa%2==1
+		local rb = i==lxb and xb%2==0
+		
+		local lc = 0
+		
+		if lb and not rb then
+			lp = peek(p_pix)
 			lp %= 16
 			lc = lp+(c*16)
 		end
 		
-		if i==lxb and xb%2==0 then
-			rp = peek(p_screen+i+ly)
-			rp /= 16
+		if not lb and not rb then	
+			lc = c%16+c*16
+		end
+		
+		if not lb and rb then
+			rp = peek(p_pix)
+			rp *= rec16
 			lc = (c%16)+rp
 		end
 
@@ -47,10 +70,14 @@ end
 -->8
 -- main
 
-p_screen = 0x6000
 use_poke = false
 
+sx = 0
+
 function _update60()
+	if(btnp(0)) then sx -= 1 end
+	if(btnp(1)) then sx += 1 end
+
 	if(btnp(4)) then
 		use_poke = not use_poke
 	end
@@ -59,9 +86,11 @@ end
 function _draw()
 	cls()
 	
+	--[[
 	for y=0,127 do
 		for x=0,15 do
 			xa = x*8
+			xa += sx
 			xb = xa+7
  		c=x+y
  		if use_poke then
@@ -69,6 +98,23 @@ function _draw()
  		else
  			rect(xa,y,xb,y,c)
  		end
+		end
+	end
+	]]
+	
+	for x=0,127 do
+		for y=0,127 do
+			if use_poke then
+   	local lx = flr(x*0.5)
+   	local ly = (y*64)
+   	
+   	local col = x+y
+   	local c = shl(col)+col
+ 			
+ 			poke(p_screen+lx+ly,c)
+			else
+				rect(x,y,x,y,x+y)
+			end
 		end
 	end
 	
@@ -79,6 +125,7 @@ function _draw()
 	else
 		print("using rect")
 	end
-	print("cpu: "..stat(2))
+	print("cpu: "..stat(1))
+	print("fps: "..stat(7))
 end
 
