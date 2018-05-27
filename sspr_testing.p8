@@ -43,12 +43,26 @@ function x_scale(y)
 end
 
 function y_uv(y)
-	return ((scrolly/4)+(y/2))%8
+ local ysc = y/2
+ ysc += scrolly/4
+ ysc %= 8
+	return ysc
 end
 
 function x_scroll(y)
+	local ny = y/128
 	local scpan = panx/4
-	return (cos(y/128)*8*scpan)-scpan*8
+	local xs = cos(ny)
+	xs *= scpan*8
+	xs -= scpan*8
+	
+	if xs<0 then
+		xs = flr(xs)
+	else
+	 xs=ceil(xs)
+	end
+	
+	return xs
 end
 
 function _draw()
@@ -85,8 +99,6 @@ function _draw()
 			owr,1
 		)
 	end
-	
-	print(scrollx)
 end
 __gfx__
 000000000123456789abcdef000000000000000000000000000000000123456789abcdef00000000012345670000000089abcdef000000000123456789abcdef
