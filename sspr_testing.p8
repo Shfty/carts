@@ -4,7 +4,7 @@ __lua__
 panx = 0
 scrollx = 8
 scrolly = 0
-iw = 8
+iw = 4
 ow = 8
 function _update60()
 	if btn(0) then
@@ -24,18 +24,18 @@ function _update60()
 	end
 	
 	if btn(4) then
-		w -= 1
+		ow -= 1
 	end
 	
 	if btn(5) then
-		w += 1
+		ow += 1
 	end
 end
 
 function x_scale(y)
  local ly = y/128
  ly -= 0.5
- ly = sin(ly*0.5)
+ ly = sin(ly/2)
  ly *= ly
  ly += 0.2
  ly *= 5
@@ -43,8 +43,16 @@ function x_scale(y)
 end
 
 function y_uv(y)
- local ysc = y/2
- ysc += scrolly/4
+	local ny = y/128
+	
+	-- sine scaling
+ local ysc = sin(0.25+ny/2)
+ ysc *= 16
+ 
+ -- apply scrolling
+ ysc += scrolly/8
+ 
+ -- wrap every 8 pixles
  ysc %= 8
 	return ysc
 end
@@ -57,9 +65,9 @@ function x_scroll(y)
 	xs -= scpan*8
 	
 	if xs<0 then
-		xs = flr(xs)
+		xs = ceil(xs)
 	else
-	 xs=ceil(xs)
+	 xs = flr(xs)
 	end
 	
 	return xs
