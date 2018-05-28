@@ -19,8 +19,6 @@ function _update()
 	if(btn(1)) do x += 0.1 end
 	if(btn(2)) do y -= 0.1 end
 	if(btn(3)) do y += 0.1 end
-	if(btn(4)) do w += 0.1 end
-	if(btn(5)) do h += 0.1 end
 end
 
 function _draw()
