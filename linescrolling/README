@@ -1,0 +1,43 @@
+linescroll.p8
+-------------
+First attempt at a linescroll effect. Horizontal offset per line, no scaling.
+
+Also has a rudimentary object-oriented entity system for driving the player, enemies and bullets using metatables.
+
+palettescroll.p8
+----------------
+Name is misleading at this point, started as an implementation of the effect here:
+https://youtu.be/nt-AxAqlrOo
+
+When that turned out to be less performant than direct read/write, it eventually turned into reading pixels from the spritesheet using peek(), poke()ing them into userdata (faster than tables for array stuff), then iterating over them and drawing with rect()
+
+Definitely the most geometrically-stable of the implementations (less scaling artifacts), but not performant.
+
+The palettefield rendering mode toggled with button 4 is a remnant of the original implementation
+
+pokedraw.p8
+-----------
+Simple profiler to test performance of directly poking screen memory vs using API functions like rect() or spr()
+Result: Direct writes are faster, but the logic required to drive a poke() based system ends up making it slower than the built-in functions
+ 
+scalescroll.p8
+--------------
+Scales sprites directly from the spritesheet to the screen using sspr
+More performant than palettescroll, but limited to 8px wide sprites
+First implementation with different functions for per-line scrolling and scaling
+
+sspr_testing.p8
+---------------
+Initial experiments with using sspr() to draw whole sprite lines at once
+No map support as it reads whole sprites directly from the sheet
+Scrolls in spritesheet space rather than scanline space, so geometric stability relies on using a high resolution
+Worst geometric stability of the bunch when applying horizontal scroll
+Very performant compared to the other methods
+Different functions for per-line scrolling, scaling and vertical UV
+
+scalepix.p8
+-----------
+Scale each pixel of a sprite separately using sspr
+More performant than palettescroll/scalescroll, but prone to subtle geometry artifacts due to sspr() rounding. Probably fixable with enough time and effort.
+
+Also has a more advanced version of the performance HUD with rudimentary profiling support. Performance is dragged down somewhat by all of the profiling code.

@@ -9,7 +9,7 @@ scrolly = 0
 -->8
 -- perfhud
 
-enable_profiling = true
+enable_profiling = false
 
 t_prof = {}
 
