@@ -59,17 +59,14 @@ end
 -- config
 palfield_py = 64
 palfield_ph = 64
-
-function scroll_palfield(y,ph)
-	local ph = palfield_ph
-	return 0
-end
+palfield_tr = nil
+palfield_sc = nil
 
 function scale_palfield(y,ph)
-	local ph = palfield_ph
-	local ny = y/ph
-	local sc = sin(ny/4-0.5)^0.25
-	sc *= 4
+	local sc = 1
+	if palfield_sc then
+		sc = palfield_sc(y,ph)
+	end
 	return sc
 end
 
@@ -125,12 +122,15 @@ end
 
 function write_palfield(y,py,ph)
 	for x=0,127 do
-		
-		local tr =
-			scroll_palfield(y,ph)
-			
-		local sc =
-			scale_palfield(y,ph)
+ 	local tr = 0
+ 	if palfield_tr then
+ 	 tr = palfield_tr(y,ph)
+ 	end
+ 	
+ 	local sc = 1
+ 	if palfield_sc then
+ 	 sc = palfield_sc(y,ph)
+ 	end
 		
 		local lx = x
 		lx -= 64
@@ -205,10 +205,35 @@ function uv(c,y,sx,sy)
 	return uv_x(c,y,sx),uv_y(c,y,sy)
 end
 -->8
+-- scaling
+
+function scale_lin(y,ph)
+	local ph = palfield_ph
+	local ny = y/ph
+	local sc = 1+ny*3
+	return sc
+end
+
+function scale_cyl(y,ph)
+	local ph = palfield_ph
+	local ny = y/ph
+	local sc = sin(ny/4-0.5)^0.25
+	sc *= 4
+	return sc
+end
+
+function scale_icyl(y,ph)
+	local ph = palfield_ph
+	local ny = y/ph
+	local sc = 1-sin(ny/4-0.25)
+	sc *= 4
+	return sc
+end
+
+-->8
 -- main
 
-update_palfield_sync = false
-update_palfield_async = true
+update_palfield = true
 
 scrollx = 0
 scrolly = 0
@@ -216,12 +241,11 @@ scrolly = 0
 ax = 64
 ay = 96
 
+scale_idx = 0
+palfield_sc = scale_icyl
+
 function _init()
-	if update_palfield_sync then
-		gen_palfield()
-	end
-	
-	if update_palfield_async then
+	if update_palfield then
 		cstart_palfield()
 	end
 end
@@ -255,7 +279,22 @@ function _update60()
 	end
 	
 	if btnp(5) then
-		store_palfield()
+		scale_idx += 1
+		scale_idx %= 3
+		
+		if scale_idx == 0 then
+			palfield_sc = scale_icyl
+		end
+		
+		if scale_idx == 1 then
+			palfield_sc = scale_lin
+		end
+		
+		if scale_idx == 2 then
+			palfield_sc = scale_cyl
+		end
+		
+		cstart_palfield()
 	end
 
 	scrolly -= 1
@@ -286,8 +325,7 @@ function _draw()
 	 
 	-- scaled position
 	ax -= 64
-	ax += scroll_palfield(ly)
-	ax *= scale_palfield(ly)
+	ax *= palfield_sc(ly)
 	ax += 64
 	
 	sspr(
