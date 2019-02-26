@@ -757,7 +757,7 @@ move=obj:subclass({
 
 function move:update()
 	self.parent.pos += self.dp
-	self.dp=0
+	self.dp=vec2:new()
 
 	local pos =
 		self.parent:getpos()
