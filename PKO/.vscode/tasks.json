@@ -1,0 +1,159 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "options": {
+        "env": {
+            "picoPath": "P:/Personal/Pico-8/pico8.exe",
+            "picotoolPath": "C:/SDK/picotool/p8tool",
+            "assetCart": "${workspaceFolderBasename}.p8"
+        }
+    },
+    "tasks": [
+        {
+            "label": "p8tool",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Stats",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "stats",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "List Lua",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "listlua",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "List Raw Lua",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "listrawlua",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Write P8",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "writep8",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Minify Lua",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "luamin",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Format Lua",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "luafmt",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Find Lua",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "luafind",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "List Tokens",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "listtokens",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Print AST",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "printast",
+                "${file}"
+            ],
+            "problemMatcher": []
+        },
+        {
+            "label": "Build",
+            "type": "shell",
+            "command": "${config:python.pythonPath}",
+            "args": [
+                "$env:picotoolPath",
+                "build",
+                "${workspaceFolderBasename}.p8",
+                "--lua",
+                "main.lua",
+                "--gfx",
+                "$env:assetCart",
+                "--gff",
+                "$env:assetCart",
+                "--map",
+                "$env:assetCart",
+                "--sfx",
+                "$env:assetCart",
+                "--music",
+                "$env:assetCart"
+            ],
+            "problemMatcher": [],
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            }
+        },
+        {
+            "label": "Run",
+            "type": "shell",
+            "command": "P:/Personal/Pico-8/pico8.exe",
+            "args": [
+                "-run",
+                "./${workspaceFolderBasename}.p8"
+            ],
+            "problemMatcher": []
+        }
+    ]
+}

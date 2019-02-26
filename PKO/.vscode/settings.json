@@ -1,0 +1,9 @@
+{
+        "editor.rulers": [
+            32
+        ],
+        "editor.fontSize": 20,
+        "editor.tabSize": 1,
+        "editor.minimap.maxColumn": 32,
+        "editor.minimap.renderCharacters": false
+}
