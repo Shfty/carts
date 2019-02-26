@@ -91,3 +91,4 @@ function obj:destroy()
 end
 
 require("obj/prim")
+require("obj/move")

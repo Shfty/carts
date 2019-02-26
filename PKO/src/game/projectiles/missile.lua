@@ -1,31 +1,26 @@
 missile=prim:subclass({
 	name="missile",
-	a=0,
-	s=80,
-	c=7,
+	move=nil,
+	sa=0,											--start angle
+	ss=80,										--start speed
 	d=2
 })
 
 function missile:init()
 	prim.init(self)
 	circle:new(self)
+	self.move=move_p:new(self,{
+		a=self.sa,
+		s=self.ss
+	})
 	self:trail()
 end
 
 function missile:update()
-	local dp = vec2:new(
-		cos(self.a),
-		sin(self.a)
-	)
-	
+	self.move.a += 0.25 * dt
+
 	self.d -= dt
 	if(self.d <= 0) self:destroy()
-
-	self.a += 0.25 * dt
-
-	local x = dp.x * self.s * dt
-	local y = dp.y * self.s * dt
-	self.pos += vec2:new(x,y)
 	
 	prim.update(self)
 end

@@ -73,7 +73,7 @@ function pko:burst(t,num)
 	for i=0,num-1 do
 		t:new(l_ms,{
 			pos=self.pos,
-			a=i/num
+			sa=i/num
 		})
 	end
 end
