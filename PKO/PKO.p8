@@ -10,6 +10,9 @@ end
 package._c["engine/utility"]=function()
 require("utility/math")
 require("utility/vec2")
+require("utility/sprites")
+require("utility/map")
+require("utility/collision")
 require("utility/drawstate")
 require("utility/perf")
 end
@@ -98,6 +101,44 @@ function vec2:__div(rhs)
 	)
 end
 
+function vec2:__mod(rhs)
+	if(type(rhs)=="table") then
+ 	return vec2:new(
+ 		self.x%rhs.x,
+ 		self.y%rhs.y
+ 	)
+ end
+ 
+	return vec2:new(
+		self.x%rhs,
+		self.y%rhs
+	)
+end
+
+function vec2:__pow(rhs)
+	if(type(rhs)=="table") then
+ 	return vec2:new(
+ 		self.x^rhs.x,
+ 		self.y^rhs.y
+ 	)
+ end
+ 
+	return vec2:new(
+		self.x^rhs,
+		self.y^rhs
+	)
+end
+
+function vec2:__concat(rhs)
+	if(type(self)=="table") then
+		return self:tostring()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return self..rhs:tostring()
+	end
+end
+
 function vec2:sqlen()
 	local sql = 0
 	sql+=self.x^2
@@ -156,6 +197,88 @@ end
 
 function keyp(char)
 	return kp and kc == char
+end
+end
+package._c["utility/sprites"]=function()
+_old_sget = sget
+function sget(pos)
+	return _old_sget(pos.x,pos.y)
+end
+
+--sprite pos > sprite index
+--@spos vec2 sprite pixel coords
+--@return number sprite index
+function spos2idx(spos)
+	local x=flr(spos.x/8)
+	local y=flr(spos.y/8)
+	return stile2idx(vec2:new(x,y))
+end
+
+--sprite tile > sprite index
+--@spos vec2 sprite tile coords
+--@return number sprite index
+function stile2idx(stile)
+	return (stile.y*16)+stile.x
+end
+
+--sprite index > sprite tile
+--@sidx vec2 map tile coords
+--@return number sprite tile coords
+function sidx2tile(sidx)
+	return vec2:new(
+		sidx%16, 
+		flr(sidx/16)
+	)
+end
+
+--sprite index > sprite pos
+--@sidx number sprite index
+--@return number sprite pixel coords
+function sidx2pos(sidx)
+	return sidx2tile(sidx)*8
+end
+end
+package._c["utility/map"]=function()
+--map pos > map tile
+--@pos vec2 map pixel coords
+--@return vec2 map tile coords
+function mpos2tile(pos)
+	return pos/8
+end
+
+--map tile > map pos
+--@mtile vec2 map tile coords
+--@return vec2 map pixel coords
+function mtile2pos(mtile)
+	return mtile*8
+end
+
+_old_mget = mget
+function mget(pos)
+	return _old_mget(pos.x, pos.y)
+end
+end
+package._c["utility/collision"]=function()
+--check collision
+--check collision for a given px
+--@mpos vec2 map pixel coords
+--@mask (unused) number sprite flag mask
+function ccol(mpos, mask)
+	--fetch sprite from map
+	local mp = mpos2tile(mpos)
+	local s = mget(mp)
+
+	--if a sprite is present
+	if(s>0) then
+		--get spritesheet coords
+		local sp = sidx2pos(s)
+
+		--offset by tile-space pos
+		sp += mpos%8
+
+		--check if pixel is non-0
+		return sget(sp) > 0
+	end
 end
 end
 package._c["utility/drawstate"]=function()
@@ -283,6 +406,7 @@ function obj:destroy()
 end
 
 require("obj/prim")
+require("obj/move")
 end
 package._c["obj/prim"]=function()
 --primitive
@@ -620,6 +744,44 @@ function text:g_draw()
 	)
 	
 	graphic.g_draw(self)
+end
+end
+package._c["obj/move"]=function()
+--move
+--object for moving a parent
+-------------------------------
+move=obj:subclass({
+	name="move",
+	dp=vec2:new()
+})
+
+function move:update()
+	self.parent.pos += self.dp
+	self.dp=0
+
+	local pos =
+		self.parent:getpos()
+	if(ccol(pos)) then
+		self.parent:destroy()
+	end
+end
+
+--move_p
+--projectile move
+-------------------------------
+move_p=obj:subclass({
+	name="projectile move",
+	a=0,
+	s=80
+})
+
+function move_p:update()
+	self.dp = vec2:new(
+		cos(self.a),
+		sin(self.a)
+	) * self.s * dt
+	
+	move.update(self)
 end
 end
 package._c["engine/debug"]=function()
@@ -985,32 +1147,27 @@ end
 package._c["projectiles/missile"]=function()
 missile=prim:subclass({
 	name="missile",
-	a=0,
-	s=80,
-	c=7,
+	move=nil,
+	sa=0,											--start angle
+	ss=80,										--start speed
 	d=2
 })
 
 function missile:init()
 	prim.init(self)
 	circle:new(self)
+	self.move=move_p:new(self,{
+		a=self.sa,
+		s=self.ss
+	})
 	self:trail()
 end
 
 function missile:update()
-	local dp = vec2:new(
-		cos(self.a),
-		sin(self.a)
-	)
-	
+	self.move.a += 0.25 * dt
+
 	self.d -= dt
 	if(self.d <= 0) self:destroy()
-
-	self.a += 0.25 * dt
-
-	local x = dp.x * self.s * dt
-	local y = dp.y * self.s * dt
-	self.pos += vec2:new(x,y)
 	
 	prim.update(self)
 end
@@ -1114,7 +1271,7 @@ function pko:burst(t,num)
 	for i=0,num-1 do
 		t:new(l_ms,{
 			pos=self.pos,
-			a=i/num
+			sa=i/num
 		})
 	end
 end
