@@ -77,6 +77,44 @@ function vec2:__div(rhs)
 	)
 end
 
+function vec2:__mod(rhs)
+	if(type(rhs)=="table") then
+ 	return vec2:new(
+ 		self.x%rhs.x,
+ 		self.y%rhs.y
+ 	)
+ end
+ 
+	return vec2:new(
+		self.x%rhs,
+		self.y%rhs
+	)
+end
+
+function vec2:__pow(rhs)
+	if(type(rhs)=="table") then
+ 	return vec2:new(
+ 		self.x^rhs.x,
+ 		self.y^rhs.y
+ 	)
+ end
+ 
+	return vec2:new(
+		self.x^rhs,
+		self.y^rhs
+	)
+end
+
+function vec2:__concat(rhs)
+	if(type(self)=="table") then
+		return self:tostring()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return self..rhs:tostring()
+	end
+end
+
 function vec2:sqlen()
 	local sql = 0
 	sql+=self.x^2
