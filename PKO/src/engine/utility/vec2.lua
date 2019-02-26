@@ -115,6 +115,36 @@ function vec2:__concat(rhs)
 	end
 end
 
+function vec2:__eq(rhs)
+	if(type(self)=="table") then
+		return self.x==rhs.x and
+			self.y==rhs.y
+	end
+
+	return self.x==rhs and
+		self.y==rhs
+end
+
+function vec2:__lt(rhs)
+	if(type(self)=="table") then
+		return self.x<rhs.x and
+			self.y<rhs.y
+	end
+
+	return self.x<rhs and
+		self.y<rhs
+end
+
+function vec2:__le(rhs)
+	if(type(self)=="table") then
+		return self.x<=rhs.x and
+			self.y<=rhs.y
+	end
+
+	return self.x<=rhs and
+		self.y<=rhs
+end
+
 function vec2:sqlen()
 	local sql = 0
 	sql+=self.x^2
