@@ -142,9 +142,9 @@ function vec2:__concat(rhs)
 end
 
 function vec2:__eq(rhs)
-	if(type(self)=="table") then
-		return self.x==rhs.x and
-			self.y==rhs.y
+	if(type(rhs)=="table") then
+		return flr(self.x)==flr(rhs.x) and
+			flr(self.y)==flr(rhs.y)
 	end
 
 	return self.x==rhs and
@@ -152,7 +152,7 @@ function vec2:__eq(rhs)
 end
 
 function vec2:__lt(rhs)
-	if(type(self)=="table") then
+	if(type(rhs)=="table") then
 		return self.x<rhs.x and
 			self.y<rhs.y
 	end
@@ -162,7 +162,7 @@ function vec2:__lt(rhs)
 end
 
 function vec2:__le(rhs)
-	if(type(self)=="table") then
+	if(type(rhs)=="table") then
 		return self.x<=rhs.x and
 			self.y<=rhs.y
 	end
@@ -392,7 +392,7 @@ end
 package._c["utility/collision"]=function()
 collision={
 	sprite_geo={},
-	debug=true
+	debug=false
 }
 
 function collision:init(numspr)
@@ -669,7 +669,8 @@ package._c["graphic/dot"]=function()
 -------------------------------
 dot=graphic:subclass({
 	name="dot",
-	c=7 							 --color
+	c=7,								--color
+	cm=255						--collision mask
 })
 
 function dot:g_draw()
@@ -688,12 +689,12 @@ end
 function dot:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 
 	local pos = self:getpos()
-	return point == pos
+	return p == pos
 end
 
 require("dot/cursor.lua")
@@ -785,7 +786,8 @@ package._c["graphic/shape"]=function()
 shape=graphic:subclass({
 	name="shape",
 	sc=6,
-	fc=7
+	fc=7,
+	cm=255
 })
 
 function shape:g_draw()
@@ -843,18 +845,18 @@ end
 function box:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 
 	local pos = self:getpos()
 	local sz = self.sz
 
-	local x = false
+	local x = true
 	x = x and p.x >= pos.x
 	x = x and p.x <= pos.x+sz.x
 
-	local y = false
+	local y = true
 	y = y and p.y >= pos.y
 	y = y and p.y <= pos.y+sz.y
 
@@ -893,7 +895,7 @@ end
 function circle:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 
@@ -948,7 +950,7 @@ end
 function poly:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 
@@ -1616,7 +1618,6 @@ player=nil
 --initialization
 -------------------------------
 function _init()
-
 	--setup scenegraph
 	root=obj:new(nil,{
 		name="root"
@@ -1645,7 +1646,6 @@ function _init()
 	--debug ui
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
-
 		crs=cursor:new(l_ui)
 	end
 	--generate collision
@@ -1663,8 +1663,6 @@ function _update60()
 		update_kb()
 		update_mouse()
 	end
-	
-	bg:contains(crs:getpos())
 
 	root:update()
 end
