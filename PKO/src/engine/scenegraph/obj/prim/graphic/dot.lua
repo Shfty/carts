@@ -3,7 +3,8 @@
 -------------------------------
 dot=graphic:subclass({
 	name="dot",
-	c=7 							 --color
+	c=7,								--color
+	cm=255						--collision mask
 })
 
 function dot:g_draw()
@@ -22,12 +23,12 @@ end
 function dot:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 
 	local pos = self:getpos()
-	return point == pos
+	return p == pos
 end
 
 require("dot/cursor.lua")

@@ -29,7 +29,7 @@ end
 function circle:contains(p,m)
 	m = m or 255
 
-	if(not band(self.cm,m)) then
+	if(band(self.cm,m)==0) then
 		return false
 	end
 

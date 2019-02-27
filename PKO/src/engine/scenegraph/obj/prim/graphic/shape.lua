@@ -5,7 +5,8 @@
 shape=graphic:subclass({
 	name="shape",
 	sc=6,
-	fc=7
+	fc=7,
+	cm=255
 })
 
 function shape:g_draw()
