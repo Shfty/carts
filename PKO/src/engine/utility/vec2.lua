@@ -116,9 +116,9 @@ function vec2:__concat(rhs)
 end
 
 function vec2:__eq(rhs)
-	if(type(self)=="table") then
-		return self.x==rhs.x and
-			self.y==rhs.y
+	if(type(rhs)=="table") then
+		return flr(self.x)==flr(rhs.x) and
+			flr(self.y)==flr(rhs.y)
 	end
 
 	return self.x==rhs and
@@ -126,7 +126,7 @@ function vec2:__eq(rhs)
 end
 
 function vec2:__lt(rhs)
-	if(type(self)=="table") then
+	if(type(rhs)=="table") then
 		return self.x<rhs.x and
 			self.y<rhs.y
 	end
@@ -136,7 +136,7 @@ function vec2:__lt(rhs)
 end
 
 function vec2:__le(rhs)
-	if(type(self)=="table") then
+	if(type(rhs)=="table") then
 		return self.x<=rhs.x and
 			self.y<=rhs.y
 	end
