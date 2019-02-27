@@ -1,29 +1,9 @@
 pico-8 cartridge // http://www.pico-8.com
 version 8
 __lua__
-package={loaded={},_c={}}
-package._c["src/engine"]=function()
-require("engine/utility")
-require("engine/scenegraph")
-require("engine/debug")
-end
-package._c["engine/utility"]=function()
-require("utility/math")
-require("utility/vec2")
-require("utility/graphics")
-require("utility/input")
-require("utility/sprites")
-require("utility/map")
-require("utility/collision")
-require("utility/drawstate")
-require("utility/perf")
-end
-package._c["utility/math"]=function()
 function lerp(a,b,d)
 	return a+d*(b-a)
 end
-end
-package._c["utility/vec2"]=function()
 --vec2
 --two dimensional vector
 -------------------------------
@@ -213,19 +193,11 @@ function vec2:tostring()
 	return "x:"..flr(self.x)..
 	",y:"..flr(self.y)
 end
-end
-package._c["utility/graphics"]=function()
 --enable color literals
 poke(0x5f34,1)
-end
-package._c["utility/input"]=function()
 --enable devkit input
 poke(0x5f2d,1)
 
-require("input/keyboard")
-require("input/mouse")
-end
-package._c["input/keyboard"]=function()
 --keyboard
 -------------------------------
 kp=nil
@@ -239,8 +211,6 @@ end
 function keyp(char)
 	return kp and kc == char
 end
-end
-package._c["input/mouse"]=function()
 --mouse
 -------------------------------
 mp=vec2:new()
@@ -251,8 +221,6 @@ function update_mouse()
 	mp.y=stat(33)
 	mb=stat(34)
 end
-end
-package._c["utility/sprites"]=function()
 _old_sget = sget
 function sget(pos)
 	return _old_sget(pos.x,pos.y)
@@ -368,8 +336,6 @@ function convex_hull(s)
 
 	return vs
 end
-end
-package._c["utility/map"]=function()
 --map pos > map tile
 --@pos vec2 map pixel coords
 --@return vec2 map tile coords
@@ -388,8 +354,6 @@ _old_mget = mget
 function mget(pos)
 	return _old_mget(pos.x, pos.y)
 end
-end
-package._c["utility/collision"]=function()
 collision={
 	sprite_geo={},
 	debug=false
@@ -415,8 +379,6 @@ function collision:init(numspr)
 		end
 	end
 end
-end
-package._c["utility/drawstate"]=function()
 function camerapos()
 	return vec2:new(
 		peek4(0x5f26),
@@ -434,8 +396,6 @@ function getclip()
 		x2-x1,y2-y1
 	}
 end
-end
-package._c["utility/perf"]=function()
 function getfps()
 	return stat(7)
 end
@@ -443,11 +403,6 @@ end
 function getfpstarget()
 	return stat(8)
 end
-end
-package._c["engine/scenegraph"]=function()
-require("scenegraph/obj")
-end
-package._c["scenegraph/obj"]=function()
 obj_count=0
 
 --object
@@ -550,10 +505,6 @@ function obj:__concat(rhs)
 	end
 end
 
-require("obj/prim")
-require("obj/move")
-end
-package._c["obj/prim"]=function()
 --primitive
 --object with transform
 -------------------------------
@@ -581,10 +532,6 @@ function prim:tostring()
 		self.pos:tostring()
 end
 
-require("prim/cam")
-require("prim/graphic")
-end
-package._c["prim/cam"]=function()
 --cam
 --primitive to control camera
 -------------------------------
@@ -602,8 +549,6 @@ function cam:update()
 	)
 	prim.update(self)
 end
-end
-package._c["prim/graphic"]=function()
 --graphic
 --primitive with visual element
 -------------------------------
@@ -656,14 +601,6 @@ function graphic:contains(p,m)
 	return false
 end
 
-require("graphic/dot")
-require("graphic/map")
-require("graphic/shape")
-require("graphic/sprite")
-require("graphic/stripe")
-require("graphic/text")
-end
-package._c["graphic/dot"]=function()
 --dot
 --pixel graphic
 -------------------------------
@@ -697,9 +634,6 @@ function dot:contains(p,m)
 	return p == pos
 end
 
-require("dot/cursor.lua")
-end
-package._c["dot/cursor.lua"]=function()
 --cursor
 --mouse cursor
 -------------------------------
@@ -713,8 +647,6 @@ function cursor:update()
 
 	self.pos = camerapos() + mp
 end
-end
-package._c["graphic/map"]=function()
 --map
 --map graphic
 -------------------------------
@@ -777,8 +709,6 @@ function obj_map:contains(p,m)
 
 	return false
 end
-end
-package._c["graphic/shape"]=function()
 --shape
 --graphic with
 --stroke/fill colors
@@ -805,11 +735,6 @@ end
 function shape:draw_fill()
 end
 
-require("shape/box")
-require("shape/circle")
-require("shape/poly")
-end
-package._c["shape/box"]=function()
 --box
 --rect shape
 -------------------------------
@@ -862,8 +787,6 @@ function box:contains(p,m)
 
 	return x and y
 end
-end
-package._c["shape/circle"]=function()
 --circle
 --circle shape
 -------------------------------
@@ -903,8 +826,6 @@ function circle:contains(p,m)
 	local d = p-pos
 	return d:len() <= self.r
 end
-end
-package._c["shape/poly"]=function()
 --poly
 --n-sided shape
 -------------------------------
@@ -976,8 +897,6 @@ function poly:contains(p,m)
 
 	return c
 end
-end
-package._c["graphic/sprite"]=function()
 --sprite
 --sprite graphic
 -------------------------------
@@ -1035,8 +954,6 @@ function sprite:contains(p,m)
 
 	return false
 end
-end
-package._c["graphic/stripe"]=function()
 --stripe
 --line graphic
 -------------------------------
@@ -1063,8 +980,6 @@ function stripe:g_draw()
 	
 	graphic.g_draw(self)
 end
-end
-package._c["graphic/text"]=function()
 --text
 --text graphic
 -------------------------------
@@ -1086,8 +1001,6 @@ function text:g_draw()
 	
 	graphic.g_draw(self)
 end
-end
-package._c["obj/move"]=function()
 --move
 --object for moving a parent
 -------------------------------
@@ -1118,16 +1031,6 @@ function move_p:update()
 	
 	move.update(self)
 end
-end
-package._c["engine/debug"]=function()
-require("debug/dbg_ui")
-require("debug/dbg_panel")
-require("debug/dbg_ovr")
-require("debug/dbg_log")
-require("debug/dbg_sg")
-require("debug/dbg_axis")
-end
-package._c["debug/dbg_ui"]=function()
 --debug ui
 dbg_ui=graphic:subclass({
 	name="debug ui",
@@ -1183,8 +1086,6 @@ function dbg_ui:update()
 	
 	self.v = self.at != nil
 end
-end
-package._c["debug/dbg_panel"]=function()
 --debug panel
 -------------------------------
 dbg_panel=graphic:subclass({
@@ -1225,8 +1126,6 @@ function dbg_panel:tostring()
 		"w:"..flr(self.w)..","..
 		"w:"..flr(self.w)
 end
-end
-package._c["debug/dbg_ovr"]=function()
 --debug overlay
 -------------------------------
 dbg_ovr=dbg_panel:subclass({
@@ -1276,8 +1175,6 @@ function dbg_ovr:update()
 		
 	self.tw.str=str
 end
-end
-package._c["debug/dbg_log"]=function()
 --debug log
 -------------------------------
 dbg_log=dbg_panel:subclass({
@@ -1323,8 +1220,6 @@ end
 function dbg_log:clear()
 	self.buf={}
 end
-end
-package._c["debug/dbg_sg"]=function()
 --debug scenegraph
 -------------------------------
 dbg_sg=dbg_panel:subclass({
@@ -1350,8 +1245,6 @@ function dbg_sg:update()
 	self.tw.pos.y=2-self.sy
 	self.tw.str=root:print()
 end
-end
-package._c["debug/dbg_axis"]=function()
 --debug coordinate axis
 -------------------------------
 dbg_axis=prim:subclass({
@@ -1379,16 +1272,6 @@ function dbg_axis:draw()
 	
 	prim.draw(self)
 end
-end
-package._c["src/game"]=function()
-require("game/effects")
-require("game/projectiles")
-require("game/pko")
-end
-package._c["game/effects"]=function()
-require("effects/trail")
-end
-package._c["effects/trail"]=function()
 trail=graphic:subclass({
 	name="trail",
 	cs={12,13,1}, --colors
@@ -1436,12 +1319,6 @@ function trail:g_draw()
 	
 	graphic.g_draw(self)
 end
-end
-package._c["game/projectiles"]=function()
-require("projectiles/missile")
-require("projectiles/laser")
-end
-package._c["projectiles/missile"]=function()
 missile=prim:subclass({
 	name="missile",
 	move=nil,
@@ -1481,8 +1358,6 @@ function missile:trail()
 		cs={6,12,13,1}
 	})
 end
-end
-package._c["projectiles/laser"]=function()
 --laser
 -------------------------------
 laser=missile:subclass({
@@ -1498,8 +1373,6 @@ end
 function laser:trail()
 	return trail:new(self)
 end
-end
-package._c["game/pko"]=function()
 pko=prim:subclass({
 	name="pko",
 	pos=vec2:new(64,64),
@@ -1578,15 +1451,6 @@ function pko:burst(t,num)
 		})
 	end
 end
-end
-function require(p)
-local l=package.loaded
-if (l[p]==nil) l[p]=package._c[p]()
-if (l[p]==nil) l[p]=true
-return l[p]
-end
-require("src/engine")
-require("src/game")
 
 --main
 
@@ -1663,7 +1527,7 @@ function _update60()
 		update_kb()
 		update_mouse()
 	end
-
+	
 	root:update()
 end
 
@@ -1880,5 +1744,86 @@ __music__
 00 41424344
 00 41424344
 00 41424344
+00 41424344
+
+00000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+001000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+__music__
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+00 41424344
+
 00 41424344
 
