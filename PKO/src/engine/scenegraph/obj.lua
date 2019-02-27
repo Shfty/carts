@@ -90,5 +90,15 @@ function obj:destroy()
 	obj_count-=1
 end
 
+function obj:__concat(rhs)
+	if(type(self)=="table") then
+		return self:tostring()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return self..rhs:tostring()
+	end
+end
+
 require("obj/prim")
 require("obj/move")
