@@ -25,3 +25,4 @@ end
 
 require("shape/box")
 require("shape/circle")
+require("shape/poly")
