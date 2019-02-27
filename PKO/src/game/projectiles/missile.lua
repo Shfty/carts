@@ -1,9 +1,10 @@
 missile=prim:subclass({
 	name="missile",
 	move=nil,
-	sa=0,											--start angle
-	ss=80,										--start speed
-	d=2
+	sa=0,					--start angle
+	ss=80,				--start speed
+	d=2,						--duration
+	cm=1						--collision mask
 })
 
 function missile:init()
@@ -26,7 +27,7 @@ function missile:update()
 
 	local pos =
 		self:getpos()
-	if(ccol(pos)) then
+	if(bg:contains(pos, self.cm)) then
 		self:destroy()
 	end
 end

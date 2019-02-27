@@ -13,6 +13,8 @@ dt=nil
 
 root=nil
 
+bg=nil
+
 l_pl=nil
 l_tr=nil
 l_ms=nil
@@ -53,12 +55,14 @@ function _init()
 	})
 	
 	player=pko:new(l_pl)
-	
+
 	--debug ui
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
 		crs=cursor:new(l_ui)
 	end
+	--generate collision
+	collision:init()
 end
 
 --main loop
