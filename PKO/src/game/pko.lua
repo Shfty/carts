@@ -62,17 +62,13 @@ function pko:update()
 	self.pos.y += self.vy * dt
 
 	if(btnp(4)) then
-		self:burst(missile,40)
+		self:burst(missile,16)
 	end
  
 	prim.update(self)
 end
 
 function pko:burst(t,num)
-	if(debug_mode) then
-		log("burst")
-	end
-	
 	for i=0,num-1 do
 		t:new(l_ms,{
 			pos=self.pos,
