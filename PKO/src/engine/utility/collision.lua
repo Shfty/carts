@@ -1,6 +1,6 @@
 collision={
 	sprite_geo={},
-	debug=true
+	debug=false
 }
 
 function collision:init(numspr)
