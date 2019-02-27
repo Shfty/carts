@@ -1,21 +1,25 @@
---check collision
---check collision for a given px
---@mpos vec2 map pixel coords
---@mask (unused) number sprite flag mask
-function ccol(mpos, mask)
-	--fetch sprite from map
-	local mp = mpos2tile(mpos)
-	local s = mget(mp)
+collision={
+	sprite_geo={},
+	debug=true
+}
 
-	--if a sprite is present
-	if(s>0) then
-		--get spritesheet coords
-		local sp = sidx2pos(s)
+function collision:init(numspr)
+	numspr = numspr or 128
 
-		--offset by tile-space pos
-		sp += mpos%8
+	for i=0,numspr-1 do
+		if(fget(i)>0) then
+			local k = tostr(i)
+		 local vs = convex_hull(i)
+			self.sprite_geo[k] = vs
 
-		--check if pixel is non-0
-		return sget(sp) > 0
+			if(self.debug) then
+				poly:fromsprite(l_pl,i,{
+					pos=vec2:new(
+						(i%16)*10,
+						flr(i/16)*10
+					)
+				})
+			end
+		end
 	end
 end
