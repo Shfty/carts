@@ -17,12 +17,18 @@ function missile:init()
 end
 
 function missile:update()
-	self.move.a += 0.25 * dt
+	--self.move.a += 0.25 * dt
 
 	self.d -= dt
 	if(self.d <= 0) self:destroy()
 	
 	prim.update(self)
+
+	local pos =
+		self:getpos()
+	if(ccol(pos)) then
+		self:destroy()
+	end
 end
 
 function missile:trail()

@@ -9,12 +9,6 @@ move=obj:subclass({
 function move:update()
 	self.parent.pos += self.dp
 	self.dp=vec2:new()
-
-	local pos =
-		self.parent:getpos()
-	if(ccol(pos)) then
-		self.parent:destroy()
-	end
 end
 
 --move_p
