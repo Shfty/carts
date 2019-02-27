@@ -3,13 +3,12 @@
 -------------------------------
 box=shape:subclass({
 	name="box",
-	sz=vec2:new(8,8),  --size
-	og=vec2:new(0,0) --origin
+	sz=vec2:new(8,8)  --size
 })
 
 function box:draw_fill()
 	local pos=self:getpos()
-	pos -= self.og
+	pos -= self.org
 	rectfill(
 		pos.x,
 		pos.y,
@@ -21,7 +20,7 @@ end
 
 function box:draw_stroke()
 	local pos=self:getpos()
-	pos -= self.og
+	pos -= self.org
 	rect(
 		pos.x,
 		pos.y,
