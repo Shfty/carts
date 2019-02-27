@@ -3,9 +3,10 @@
 -------------------------------
 graphic=prim:subclass({
 	name="graphic",
-	v=true,									--visible
-	clip=nil, 							  --clip
-	_cclip=nil  							--cached clip
+	v=true,							--visible
+	cm=nil,							--collision mask
+	clip=nil,					--clip
+	_cclip=nil				--cached clip
 })
 
 function graphic:draw()
@@ -45,7 +46,7 @@ function graphic:g_postdraw()
 	end
 end
 
-function graphic:contains(point)
+function graphic:contains(p,m)
 	return false
 end
 

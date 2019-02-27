@@ -23,11 +23,19 @@ function sprite:g_draw()
 	graphic.g_draw(self)
 end
 
-function sprite:contains(point)
+function sprite:contains(p,m)
+	m = m or 255
+
 	--if a sprite is present
 	if(self.s>0) then
+		local cm =
+			self.cm or fget(self.s)
+		if(band(m,cm)==0) then
+			return false
+		end
+		
 		local pos = self:getpos()
-		local lpos = point-pos
+		local lpos = p-pos
 		
 		if(lpos.x < 0 or
 			lpos.y < 0) then
@@ -35,7 +43,7 @@ function sprite:contains(point)
 		end
 
 		if(lpos.x > self.sz.x*8 or
-			lpos.x > self.sz.y*8) then
+			lpos.y > self.sz.y*8) then
 			return false
 		end
 	

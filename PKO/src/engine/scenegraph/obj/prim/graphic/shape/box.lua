@@ -30,17 +30,23 @@ function box:draw_stroke()
  )
 end
 
-function box:contains(point)
+function box:contains(p,m)
+	m = m or 255
+
+	if(not band(self.cm,m)) then
+		return false
+	end
+
 	local pos = self:getpos()
 	local sz = self.sz
 
 	local x = false
-	x = x and point.x >= pos.x
-	x = x and point.x <= pos.x+sz.x
+	x = x and p.x >= pos.x
+	x = x and p.x <= pos.x+sz.x
 
 	local y = false
-	y = y and point.y >= pos.y
-	y = y and point.y <= pos.y+sz.y
+	y = y and p.y >= pos.y
+	y = y and p.y <= pos.y+sz.y
 
 	return x and y
 end

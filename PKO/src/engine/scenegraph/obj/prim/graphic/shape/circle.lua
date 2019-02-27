@@ -26,8 +26,14 @@ function circle:draw_stroke()
  )
 end
 
-function circle:contains(point)
+function circle:contains(p,m)
+	m = m or 255
+
+	if(not band(self.cm,m)) then
+		return false
+	end
+
 	local pos = self:getpos()
-	local d = point-pos
+	local d = p-pos
 	return d:len() <= self.r
 end
