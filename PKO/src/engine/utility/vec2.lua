@@ -156,6 +156,24 @@ function vec2:len()
 	return sqrt(self:sqlen())
 end
 
+function vec2:normalize()
+	return self/self:len()
+end
+
+function vec2:perp_ccw()
+	return vec2:new(-self.y,self.x)
+end
+
+function vec2:perp_cw()
+	return vec2:new(self.y,-self.x)
+end
+
+function vec2:dot(rhs)
+	local d=self.x*rhs.x
+	d+=self.y*rhs.y
+	return d
+end
+
 function vec2:lerp(tgt,d)
 	d = max(d,0)
 	d = min(d,1)
