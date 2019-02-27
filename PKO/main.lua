@@ -22,6 +22,8 @@ function log(str)
 	d_ui.tabs["2"]:log(str)
 end
 
+crs=nil
+
 player=nil
 
 --initialization
@@ -55,6 +57,7 @@ function _init()
 	--debug ui
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
+		crs=cursor:new(l_ui)
 	end
 end
 
@@ -67,6 +70,7 @@ function _update60()
 	
 	if(debug_mode) then
 		update_kb()
+		update_mouse()
 	end
 	
 	root:update()
