@@ -3,7 +3,6 @@
 -------------------------------
 stripe=graphic:subclass({
 	name="stripe",
-	org=vec2:new(-0.5,-0.5),
 	tp=vec2:new(8,0),	--target pos
 	at=true,										--abs target
 	c=7								       --color

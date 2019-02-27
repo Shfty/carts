@@ -4,8 +4,8 @@
 graphic=prim:subclass({
 	name="graphic",
 	v=true,									--visible
-	c=nil, 							  --clip
-	_cc=nil  							--cached clip
+	clip=nil, 							  --clip
+	_cclip=nil  							--cached clip
 })
 
 function graphic:draw()
@@ -19,23 +19,13 @@ function graphic:draw()
 end
 
 function graphic:g_predraw()
-	if(self.d) then
-		self.cd=getclip()
+	if(self.clip) then
+		self._cclip=getclip()
 		clip(
-			self.d[1],
-			self.c[2],
-			self.c[3],
-			self.c[4]
-		)
-	end
-	
-	if(self.c) then
-		self.cc=getclip()
-		clip(
-			self.c[1],
-			self.c[2],
-			self.c[3],
-			self.c[4]
+			self.clip[1],
+			self.clip[2],
+			self.clip[3],
+			self.clip[4]
 		)
 	end
 end
@@ -44,15 +34,19 @@ function graphic:g_draw()
 end
 
 function graphic:g_postdraw()
-	if(self._cc) then
+	if(self._cclip) then
 		clip(
-			self._cc[1],
-			self._cc[2],
-			self._cc[3],
-			self._cc[4]
+			self._cclip[1],
+			self._cclip[2],
+			self._cclip[3],
+			self._cclip[4]
 		)
-		self._cc=nil
+		self._cclip=nil
 	end
+end
+
+function graphic:contains(point)
+	return false
 end
 
 require("graphic/dot")

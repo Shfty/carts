@@ -3,7 +3,6 @@
 -------------------------------
 circle=shape:subclass({
 	name="circle",
-	org=vec2:new(-0.5,-0.5),
 	r=1,								   --radius
 })
 
@@ -25,4 +24,10 @@ function circle:draw_stroke()
 		self.r,
  	self.sc
  )
+end
+
+function circle:contains(point)
+	local pos = self:getpos()
+	local d = point-pos
+	return d:len() <= self.r
 end

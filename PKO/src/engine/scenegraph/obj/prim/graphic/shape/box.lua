@@ -30,3 +30,18 @@ function box:draw_stroke()
  	self.sc
  )
 end
+
+function box:contains(point)
+	local pos = self:getpos()
+	local sz = self.sz
+
+	local x = false
+	x = x and point.x >= pos.x
+	x = x and point.x <= pos.x+sz.x
+
+	local y = false
+	y = y and point.y >= pos.y
+	y = y and point.y <= pos.y+sz.y
+
+	return x and y
+end

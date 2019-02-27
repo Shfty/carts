@@ -3,7 +3,6 @@
 -------------------------------
 dot=graphic:subclass({
 	name="dot",
-	org=vec2:new(-0.5,-0.5),
 	c=7 							 --color
 })
 
@@ -19,3 +18,10 @@ function dot:g_draw()
 	
 	graphic.g_draw(self)
 end
+
+function dot:contains(point)
+	local pos = self:getpos()
+	return point == pos
+end
+
+require("dot/cursor.lua")
