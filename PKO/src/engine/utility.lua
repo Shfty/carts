@@ -1,5 +1,7 @@
 require("utility/math")
 require("utility/vec2")
+require("utility/graphics")
+require("utility/input")
 require("utility/sprites")
 require("utility/map")
 require("utility/collision")
