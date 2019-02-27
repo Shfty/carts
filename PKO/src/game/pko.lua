@@ -5,16 +5,19 @@ pko=prim:subclass({
 	vy=0,
 	ac=600,
 	dc=600,
-	mv=60
+	mv=60,
+	sc=nil,	--sprite component
+	tc=nil,	--trail component
+	cc=nil		--camera component
 })
 
 function pko:init()
 	prim.init(self)
-	sprite:new(self,{
+	self.sc=sprite:new(self,{
 		s=1
 	})
-	trail:new(self)
-	cam:new(self)
+	self.tc=trail:new(self)
+	self.cc=cam:new(self)
 end
 
 function pko:update()
@@ -60,7 +63,7 @@ function pko:update()
 
 	if(btnp(4)) then
 		self:burst(missile,40)
- end
+	end
  
 	prim.update(self)
 end
