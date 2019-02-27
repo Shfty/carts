@@ -169,38 +169,3 @@ function vec2:tostring()
 	return "x:"..flr(self.x)..
 	",y:"..flr(self.y)
 end
-
---input
-poke(0x5f2d,1)
-
---graphics
-poke(0x5f34,1)
-
---keyboard
--------------------------------
-kp=nil
-kc=nil
-
-function update_kb()
-	kp=stat(30)
-	kc=stat(31)
-end
-
-function keyp(char)
-	return kp and kc == char
-end
-
---mouse
--------------------------------
-mp=vec2:new()
-mb=0
-
-function update_mouse()
-	mp.x=stat(32)
-	mp.y=stat(33)
-	mb=stat(34)
-end
-
-function keyp(char)
-	return kp and kc == char
-end
