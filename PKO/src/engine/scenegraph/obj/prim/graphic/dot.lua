@@ -31,4 +31,4 @@ function dot:contains(p,m)
 	return p == pos
 end
 
-require("dot/cursor.lua")
+require("dot/cursor")
