@@ -5,7 +5,7 @@
     "options": {
         "env": {
             "picoPath": "P:/Personal/Pico-8/pico8.exe",
-            "picotoolPath": "C:/SDK/picotool/p8tool",
+            "p8utilPath": "C:/SDK/p8util/p8util.py",
             "assetCart": "${workspaceFolderBasename}.p8"
         }
     },
@@ -123,21 +123,9 @@
             "type": "shell",
             "command": "${config:python.pythonPath}",
             "args": [
-                "$env:picotoolPath",
-                "build",
+                "$env:p8utilPath",
                 "${workspaceFolderBasename}.p8",
-                "--lua",
-                "main.lua",
-                "--gfx",
-                "$env:assetCart",
-                "--gff",
-                "$env:assetCart",
-                "--map",
-                "$env:assetCart",
-                "--sfx",
-                "$env:assetCart",
-                "--music",
-                "$env:assetCart"
+                "main.lua"
             ],
             "problemMatcher": [],
             "group": {
