@@ -1,3 +1,6 @@
+--perf
+--performance utility functions
+-------------------------------
 function getfps()
 	return stat(7)
 end

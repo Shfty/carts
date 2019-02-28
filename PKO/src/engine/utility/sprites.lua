@@ -1,3 +1,7 @@
+--sprites
+--wrapper for pico8 sprite
+--functionality
+-------------------------------
 _old_sget = sget
 function sget(pos)
 	return _old_sget(pos.x,pos.y)

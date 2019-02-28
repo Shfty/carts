@@ -1,4 +1,5 @@
 --laser
+--reflective projectile
 -------------------------------
 laser=missile:subclass({
 	name="laser"

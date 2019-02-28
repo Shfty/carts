@@ -1,9 +1,23 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
+--engine
+--collection of engine
+--functionality
+-------------------------------
+
+--utility
+--collection of utility
+--functionality
+-------------------------------
+
+--math
+--utility math functions
+-------------------------------
 function lerp(a,b,d)
 	return a+d*(b-a)
 end
+
 --vec2
 --two dimensional vector
 -------------------------------
@@ -193,22 +207,30 @@ function vec2:tostring()
 	return "x:"..flr(self.x)..
 	",y:"..flr(self.y)
 end
+
 --enable color literals
 poke(0x5f34,1)
+
+--input
+--collection of input wrappers
+-------------------------------
 --enable devkit input
 poke(0x5f2d,1)
 
+--controller
+--wrapper for pico8 gamepad
+-------------------------------
 controller = {
-	p=0,
+	p=0,							--player index
 	dpad=vec2:new(),
 
-	a=false,
-	_la=false,
-	ap=false,
+	a=false,			--a button
+	_la=false,	--last a button
+	ap=false,		--a pressed
 	
-	b=false,
-	_lb=false,
-	bp=false
+	b=false,			--b button
+	_lb=false,	--last b button
+	bp=false			--b pressed
 }
 
 function controller:new(p)
@@ -237,6 +259,10 @@ function controller:update()
 	self.b=btn(5,self.p)
 	self.bp=self.b and not self._lb
 end
+
+--controller
+--wrapper for keyboard input
+-------------------------------
 kb = {
 	kp=nil,
 	kc=nil
@@ -250,6 +276,10 @@ end
 function kb:keyp(char)
 	return self.kp and self.kc == char
 end
+
+--mouse
+--wrapper for mouse input
+-------------------------------
 mouse = {
 	mp=vec2:new(),
 	mb=0
@@ -260,6 +290,12 @@ function mouse:update()
 	self.mp.y=stat(33)
 	self.mb=stat(34)
 end
+
+
+--sprites
+--wrapper for pico8 sprite
+--functionality
+-------------------------------
 _old_sget = sget
 function sget(pos)
 	return _old_sget(pos.x,pos.y)
@@ -375,6 +411,11 @@ function convex_hull(s)
 
 	return vs
 end
+
+--map
+--wrapper for pico8 map
+--functionality
+-------------------------------
 --map pos > map tile
 --@pos vec2 map pixel coords
 --@return vec2 map tile coords
@@ -398,6 +439,11 @@ _old_mset = mset
 function mset(p,c)
 	return _old_mset(p.x, p.y,c)
 end
+
+--collision
+--wrapper for collision
+--functionality
+-------------------------------
 collision={
 	sprite_geo={},
 	debug=false
@@ -423,6 +469,11 @@ function collision:init(numspr)
 		end
 	end
 end
+
+--drawstate
+--wrapper for pico8
+--internal draw state
+-------------------------------
 drawstate={}
 
 function drawstate:campos()
@@ -442,6 +493,10 @@ function drawstate:getclip()
 		x2-x1,y2-y1
 	}
 end
+
+--perf
+--performance utility functions
+-------------------------------
 function getfps()
 	return stat(7)
 end
@@ -449,11 +504,18 @@ end
 function getfpstarget()
 	return stat(8)
 end
-obj_count=0
+
+
+--scenegraph
+--collection of scene graph
+--functionality
+-------------------------------
 
 --object
 --basic scene graph unit
 -------------------------------
+obj_count=0
+
 obj={
 	name="object",
 	parent=nil,
@@ -595,6 +657,7 @@ function cam:update()
 	)
 	prim.update(self)
 end
+
 --graphic
 --primitive with visual element
 -------------------------------
@@ -693,6 +756,8 @@ function cursor:update()
 
 	self.pos = drawstate:campos() + mouse.mp
 end
+
+
 --map
 --map graphic
 -------------------------------
@@ -776,6 +841,7 @@ end
 
 	return false
 end
+
 --shape
 --graphic with
 --stroke/fill colors
@@ -854,6 +920,7 @@ function box:contains(p,m)
 
 	return x and y
 end
+
 --circle
 --circle shape
 -------------------------------
@@ -893,6 +960,7 @@ function circle:contains(p,m)
 	local d = p-pos
 	return d:len() <= self.r
 end
+
 --poly
 --n-sided shape
 -------------------------------
@@ -964,6 +1032,8 @@ function poly:contains(p,m)
 
 	return c
 end
+
+
 --sprite
 --sprite graphic
 -------------------------------
@@ -1021,6 +1091,7 @@ function sprite:contains(p,m)
 
 	return false
 end
+
 --stripe
 --line graphic
 -------------------------------
@@ -1047,6 +1118,7 @@ function stripe:g_draw()
 	
 	graphic.g_draw(self)
 end
+
 --text
 --text graphic
 -------------------------------
@@ -1068,6 +1140,9 @@ function text:g_draw()
 	
 	graphic.g_draw(self)
 end
+
+
+
 --move
 --object for moving a parent
 -------------------------------
@@ -1081,16 +1156,16 @@ function move:update()
 	self.dp=vec2:new()
 end
 
---move_p
+--proj_move
 --projectile move
 -------------------------------
-move_p=obj:subclass({
+proj_move=obj:subclass({
 	name="projectile move",
 	a=0,
 	s=80
 })
 
-function move_p:update()
+function proj_move:update()
 	self.dp = vec2:new(
 		cos(self.a),
 		sin(self.a)
@@ -1098,6 +1173,63 @@ function move_p:update()
 	
 	move.update(self)
 end
+
+--octo_move
+--8-way move
+-------------------------------
+octo_move=move:subclass({
+	name="8-way move",
+	v=vec2:new(),		--velocity
+	mv=60,									--max velocity
+	ac=600,								--acceleration
+	dc=600,								--deceleration
+	wv=vec2:new()		--wish vector
+})
+
+function octo_move:update()
+	if(self.wv.x==0 and self.vx!=0) then
+		local dv=min(
+			self.dc*dt,
+			abs(self.v.x)
+		)*sgn(self.v.x)
+		
+		self.v.x-=dv
+	end
+	
+	if(self.wv.y==0 and self.v.y!=0) then
+		local dv=min(
+			self.dc*dt,
+			abs(self.v.y)
+		)*sgn(self.v.y)
+		
+		self.v.y-=dv
+	end
+	
+	self.v.x += self.wv.x * self.ac * dt
+	self.v.y += self.wv.y * self.ac * dt
+
+	if(abs(self.v.x) > self.mv) then
+		self.v.x=self.mv*sgn(self.v.x)
+	end
+	
+	if(abs(self.v.y) > self.mv) then
+		self.v.y=self.mv*sgn(self.v.y)
+	end
+
+	self.parent.pos.x += self.v.x * dt
+	self.parent.pos.y += self.v.y * dt
+	
+	move.update(self)
+end
+
+
+
+
+--debug
+--collection of debugging
+--functionality
+-------------------------------
+
 --debug ui
 dbg_ui=graphic:subclass({
 	name="debug ui",
@@ -1153,6 +1285,7 @@ function dbg_ui:update()
 	
 	self.v = self.at != nil
 end
+
 --debug panel
 -------------------------------
 dbg_panel=graphic:subclass({
@@ -1192,6 +1325,7 @@ function dbg_panel:tostring()
 		"w:"..flr(self.w)..","..
 		"w:"..flr(self.w)
 end
+
 --debug overlay
 -------------------------------
 dbg_ovr=dbg_panel:subclass({
@@ -1241,6 +1375,7 @@ function dbg_ovr:update()
 		
 	self.tw.str=str
 end
+
 --debug log
 -------------------------------
 dbg_log=dbg_panel:subclass({
@@ -1287,6 +1422,7 @@ end
 function dbg_log:clear()
 	self.buf={}
 end
+
 --debug scenegraph
 -------------------------------
 dbg_sg=dbg_panel:subclass({
@@ -1313,6 +1449,7 @@ function dbg_sg:update()
 	self.tw.pos.y=2-self.sy
 	self.tw.str=root:print()
 end
+
 --debug coordinate axis
 -------------------------------
 dbg_axis=prim:subclass({
@@ -1340,6 +1477,20 @@ function dbg_axis:draw()
 	
 	prim.draw(self)
 end
+
+
+
+--game
+--collection of game
+--functionality
+
+--effects
+--collection of effects
+--functionality
+
+--trail
+--line strip trail effect
+-------------------------------
 trail=graphic:subclass({
 	name="trail",
 	cs={12,13,1}, --colors
@@ -1387,6 +1538,14 @@ function trail:g_draw()
 	
 	graphic.g_draw(self)
 end
+
+
+--projectiles
+--collection of projectile
+--objects
+--missile
+--homing projectile
+-------------------------------
 missile=prim:subclass({
 	name="missile",
 	move=nil,
@@ -1399,7 +1558,7 @@ missile=prim:subclass({
 function missile:init()
 	prim.init(self)
 	circle:new(self)
-	self.move=move_p:new(self,{
+	self.move=proj_move:new(self,{
 		a=self.sa,
 		s=self.ss
 	})
@@ -1426,7 +1585,9 @@ function missile:trail()
 		cs={6,12,13,1}
 	})
 end
+
 --laser
+--reflective projectile
 -------------------------------
 laser=missile:subclass({
 	name="laser"
@@ -1441,14 +1602,15 @@ end
 function laser:trail()
 	return trail:new(self)
 end
+
+
+--pko
+--player avatar
+-------------------------------
 pko=prim:subclass({
 	name="pko",
 	pos=vec2:new(64,64),
-	vx=0,
-	vy=0,
-	ac=600,
-	dc=600,
-	mv=60,
+	mc=nil,	--move component
 	sc=nil,	--sprite component
 	tc=nil,	--trail component
 	cc=nil		--camera component
@@ -1456,6 +1618,7 @@ pko=prim:subclass({
 
 function pko:init()
 	prim.init(self)
+	self.mc=octo_move:new(self)
 	self.sc=sprite:new(self,{
 		s=1
 	})
@@ -1464,39 +1627,7 @@ function pko:init()
 end
 
 function pko:update()
-	local wv = controller.dpad
-	
-	if(wv.x==0 and self.vx!=0) then
-		local dv=min(
-			self.dc*dt,
-			abs(self.vx)
-		)*sgn(self.vx)
-		
-		self.vx-=dv
-	end
-	
-	if(wv.y==0 and self.vy!=0) then
-		local dv=min(
-			self.dc*dt,
-			abs(self.vy)
-		)*sgn(self.vy)
-		
-		self.vy-=dv
-	end
-	
-	self.vx += wv.x * self.ac * dt
-	self.vy += wv.y * self.ac * dt
-
-	if(abs(self.vx) > self.mv) then
-		self.vx=self.mv*sgn(self.vx)
-	end
-	
-	if(abs(self.vy) > self.mv) then
-		self.vy=self.mv*sgn(self.vy)
-	end
-
-	self.pos.x += self.vx * dt
-	self.pos.y += self.vy * dt
+	self.mc.wv=controller.dpad
 
 	if(controller.ap) then
 		self:burst(missile,16)
@@ -1513,6 +1644,7 @@ function pko:burst(t,num)
 		})
 	end
 end
+
 
 --config
 -------------------------------
@@ -1606,6 +1738,8 @@ function _draw()
 	cls()
 	root:draw()
 end
+
+
 __gfx__
 0000000007800e8000000000000b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000e8c79182000ee00000bb3300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -1683,60 +1817,3 @@ __map__
 5203034051515151515151420300035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5141415151515151515151514141415100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000000000000000000000000000000000000000000000000000000000000
-0
-
-
-
-
-
-000
-0
-
-
-
-
-
-
-
-
-
-
-
-000
-0
-
-
-
-
-
-
-
-
-
-
-000
-0
-
-
-
-
-
-
-
-
-
-
-
-000
-0
-
-
-
-
-
-
-
-
-
-

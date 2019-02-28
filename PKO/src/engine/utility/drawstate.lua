@@ -1,3 +1,7 @@
+--drawstate
+--wrapper for pico8
+--internal draw state
+-------------------------------
 drawstate={}
 
 function drawstate:campos()

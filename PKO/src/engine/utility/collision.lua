@@ -1,3 +1,7 @@
+--collision
+--wrapper for collision
+--functionality
+-------------------------------
 collision={
 	sprite_geo={},
 	debug=false

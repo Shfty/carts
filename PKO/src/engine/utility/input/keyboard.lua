@@ -1,3 +1,6 @@
+--controller
+--wrapper for keyboard input
+-------------------------------
 kb = {
 	kp=nil,
 	kc=nil

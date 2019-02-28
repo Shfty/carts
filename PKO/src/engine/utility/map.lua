@@ -1,3 +1,7 @@
+--map
+--wrapper for pico8 map
+--functionality
+-------------------------------
 --map pos > map tile
 --@pos vec2 map pixel coords
 --@return vec2 map tile coords

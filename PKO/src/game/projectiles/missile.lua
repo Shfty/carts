@@ -1,3 +1,6 @@
+--missile
+--homing projectile
+-------------------------------
 missile=prim:subclass({
 	name="missile",
 	move=nil,

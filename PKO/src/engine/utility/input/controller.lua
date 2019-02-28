@@ -1,14 +1,17 @@
+--controller
+--wrapper for pico8 gamepad
+-------------------------------
 controller = {
-	p=0,
+	p=0,							--player index
 	dpad=vec2:new(),
 
-	a=false,
-	_la=false,
-	ap=false,
+	a=false,			--a button
+	_la=false,	--last a button
+	ap=false,		--a pressed
 	
-	b=false,
-	_lb=false,
-	bp=false
+	b=false,			--b button
+	_lb=false,	--last b button
+	bp=false			--b pressed
 }
 
 function controller:new(p)

@@ -1,3 +1,6 @@
+--mouse
+--wrapper for mouse input
+-------------------------------
 mouse = {
 	mp=vec2:new(),
 	mb=0

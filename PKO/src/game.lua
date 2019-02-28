@@ -1,3 +1,7 @@
+--game
+--collection of game
+--functionality
+
 require("game/effects")
 require("game/projectiles")
 require("game/pko")

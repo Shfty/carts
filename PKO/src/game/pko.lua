@@ -1,3 +1,6 @@
+--pko
+--player avatar
+-------------------------------
 pko=prim:subclass({
 	name="pko",
 	pos=vec2:new(64,64),

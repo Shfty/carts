@@ -1,3 +1,8 @@
+--utility
+--collection of utility
+--functionality
+-------------------------------
+
 require("utility/math")
 require("utility/vec2")
 require("utility/graphics")

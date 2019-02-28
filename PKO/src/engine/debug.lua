@@ -1,3 +1,8 @@
+--debug
+--collection of debugging
+--functionality
+-------------------------------
+
 require("debug/dbg_ui")
 require("debug/dbg_panel")
 require("debug/dbg_ovr")

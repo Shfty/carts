@@ -1,3 +1,6 @@
+--trail
+--line strip trail effect
+-------------------------------
 trail=graphic:subclass({
 	name="trail",
 	cs={12,13,1}, --colors

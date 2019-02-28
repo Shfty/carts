@@ -1,8 +1,8 @@
-obj_count=0
-
 --object
 --basic scene graph unit
 -------------------------------
+obj_count=0
+
 obj={
 	name="object",
 	parent=nil,
