@@ -33,7 +33,5 @@ function circle:contains(p,m)
 		return false
 	end
 
-	local pos = self:getpos()
-	local d = p-pos
-	return d:len() <= self.r
+	return collision:p_in_c(p,self)
 end

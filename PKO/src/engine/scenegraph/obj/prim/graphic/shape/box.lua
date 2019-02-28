@@ -37,16 +37,5 @@ function box:contains(p,m)
 		return false
 	end
 
-	local pos = self:getpos()
-	local sz = self.sz
-
-	local x = true
-	x = x and p.x >= pos.x
-	x = x and p.x <= pos.x+sz.x
-
-	local y = true
-	y = y and p.y >= pos.y
-	y = y and p.y <= pos.y+sz.y
-
-	return x and y
+	return collision:p_in_b(p,self)
 end

@@ -34,6 +34,7 @@ player=nil
 -------------------------------
 function _init()
 	--generate collision
+	collision:init()
 
 	--setup scenegraph
 	root=obj:new(nil,{
