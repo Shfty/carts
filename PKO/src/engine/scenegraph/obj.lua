@@ -62,14 +62,24 @@ function obj:remchild(c)
 	del(self.children,c)
 end
 
-function obj:tostring()
+function obj:__tostr()
 	return self.name
+end
+
+function obj.__concat(lhs, rhs)
+	if(type(lhs)=="table") then
+		return lhs:__tostr()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return lhs..rhs:__tostr()
+	end
 end
 
 function obj:print(pf)
 	pf=pf or ""
 	local str = pf
-	str=str..self:tostring()
+	str=str..self:__tostr()
 	str=str.."\n"
 	
 	for c in all(self.children) do
@@ -104,16 +114,6 @@ function obj:destroy()
 	end
 	
 	obj_count-=1
-end
-
-function obj:__concat(rhs)
-	if(type(self)=="table") then
-		return self:tostring()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return self..rhs:tostring()
-	end
 end
 
 require("obj/prim")

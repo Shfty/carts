@@ -19,12 +19,12 @@ function prim:getpos()
 	return pos
 end
 
-function prim:tostring()
+function prim:__tostr()
 	return
-		obj.tostring(self).." - "..
-		self.pos:tostring()
+		obj.__tostr(self).." - "..
+		self.pos:__tostr()
 end
 
-require("prim/cam")
-require("prim/cursor")
 require("prim/graphic")
+require("prim/cam")
+require("prim/pointer")

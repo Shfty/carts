@@ -31,9 +31,9 @@ function dbg_panel:update()
 	graphic.update(self)
 end
 
-function dbg_panel:tostring()
+function dbg_panel:__tostr()
 	return
-		prim.tostring(self).." "..
+		prim.__tostr(self).." "..
 		"w:"..flr(self.w)..","..
 		"w:"..flr(self.w)
 end

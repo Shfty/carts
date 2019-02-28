@@ -6,11 +6,11 @@ vec2={
 	y=0
 }
 
-function vec2:new(ix,iy)
+function vec2:new(x,y)
 	self.__index=self
 	return setmetatable({
-		x=ix or 0,
-		y=iy or 0
+		x=x or 0,
+		y=y or 0
 	}, self)
 end
 
@@ -109,16 +109,6 @@ function vec2:__pow(rhs)
 	)
 end
 
-function vec2:__concat(rhs)
-	if(type(self)=="table") then
-		return self:tostring()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return self..rhs:tostring()
-	end
-end
-
 function vec2:__eq(rhs)
 	if(type(rhs)=="table") then
 		return flr(self.x)==flr(rhs.x) and
@@ -187,7 +177,17 @@ function vec2:lerp(tgt,d)
 	)
 end
 
-function vec2:tostring()
-	return "x:"..flr(self.x)..
-	",y:"..flr(self.y)
+function vec2:__tostr()
+	return "x:"..self.x..
+	",y:"..self.y
+end
+
+function vec2.__concat(lhs,rhs)
+	if(type(lhs)=="table") then
+		return lhs:__tostr()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return lhs..rhs:__tostr()
+	end
 end
