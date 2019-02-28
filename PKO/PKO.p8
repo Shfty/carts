@@ -34,6 +34,10 @@ function vec2:new(ix,iy)
 	}, self)
 end
 
+function vec2:is_a(t)
+	return t == vec2
+end
+
 function vec2:__unm()
 	return vec2:new(
 		-self.x,
@@ -454,9 +458,8 @@ function collision:init(numspr)
 
 	for i=0,numspr-1 do
 		if(fget(i)>0) then
-			local k = tostr(i)
 		 local vs = convex_hull(i)
-			self.sprite_geo[k] = vs
+			self.sprite_geo[i] = vs
 
 			if(self.debug) then
 				poly:fromsprite(l_pl,i,{
@@ -468,6 +471,217 @@ function collision:init(numspr)
 			end
 		end
 	end
+end
+
+--unified collision test
+function collision:isect(a,b,_r)
+	r = r or false
+
+	--point > circle
+	if(a:is_a(vec2) and
+				b:is_a(circle)) then
+		return self:p_in_c(a,b)
+	end
+
+	--point > box
+	if(a:is_a(vec2) and
+				b:is_a(box)) then
+		return self:p_in_b(a,b)
+	end
+
+	--point > polygon
+	if(a:is_a(vec2) and
+				b:is_a(poly)) then
+		return self:p_in_py(a,b)
+	end
+
+	--point > sprite
+	if(a:is_a(vec2) and
+				b:is_a(sprite)) then
+		return self:p_in_s(a,b)
+	end
+
+	--circle > circle
+	if(a:is_a(circle) and
+				b:is_a(circle)) then
+		return self:c_isect_c(a,b)
+	end
+
+	--circle > box
+	if(a:is_a(circle) and
+				b:is_a(box)) then
+		return self:c_isect_b(a,b)
+	end
+
+	--circle > poly
+	if(a:is_a(circle) and
+				b:is_a(poly)) then
+		return self:c_isect_py(a,b)
+	end
+
+	--circle > sprite
+	if(a:is_a(circle) and
+				b:is_a(sprite)) then
+	end
+
+	--box > box
+	if(a:is_a(box) and
+				b:is_a(box)) then
+	end
+
+	--box > poly
+	if(a:is_a(box) and
+				b:is_a(poly)) then
+	end
+
+	--box > sprite
+	if(a:is_a(box) and
+				b:is_a(sprite)) then
+	end
+
+	--poly > poly
+	if(a:is_a(poly) and
+				b:is_a(poly)) then
+	end
+
+	--poly > sprite
+	if(a:is_a(box) and
+				b:is_a(sprite)) then
+	end
+
+	--sprite > sprite
+	if(a:is_a(sprite) and
+				b:is_a(sprite)) then
+	end
+
+	--try reversing arguments
+	if not _r then
+		return self:isect(b,a,true)
+	else
+		log("unsupported collision")
+		return false
+	end
+end
+
+--point in circle
+function collision:p_in_c(p,c)
+	local d = p-c:getpos()
+	return d:len() <= c.r
+end
+
+--point in box
+function collision:p_in_b(p,b)
+	local pos = b:getpos()
+	local sz = b.sz
+
+	local x = true
+	x = x and p.x >= pos.x
+	x = x and p.x <= pos.x+sz.x
+
+	local y = true
+	y = y and p.y >= pos.y
+	y = y and p.y <= pos.y+sz.y
+
+	return x and y
+end
+
+--point in polygon
+function collision:p_in_py(p,py)
+	local pos = py:getpos()
+	local c=true
+
+	for i=1,#py.vs do
+		local v1 = py.vs[i]
+		v1 += pos
+
+		local v2 =
+			py.vs[i+1] or py.vs[1]
+		v2 += pos
+
+		local d = (v2-v1)
+		d=d:normalize()
+		d=d:perp_ccw()
+
+		if(d:dot(p-v1)<0) then
+			c=false
+		end
+	end
+
+	return c
+end
+
+--point in sprite
+function collision:p_in_s(p,s)
+	local pos = s:getpos()
+	local lpos = p-pos
+
+	if(lpos.x < 0 or
+		lpos.y < 0) then
+		return false
+	end
+
+	if(lpos.x > s.sz.x*8 or
+		lpos.y > s.sz.y*8) then
+		return false
+	end
+
+	--get spritesheet coords
+	local sp = sidx2pos(s.s)
+
+	return sget(sp+lpos)>0
+end
+
+--circle intersect circle
+function collision:c_isect_c(a,b)
+	local d = b:getpos()-a:getpos()
+	return d:len() <= a.r + b.r
+end
+
+--circle intersect box
+function collision:c_isect_b(c,b)
+	local bx = box:new(nil, {
+		pos=b:getpos() - vec2:new(c.r,0),
+		sz=b.sz + vec2:new(c.r*2,0)
+	})
+
+	local by = box:new(nil, {
+		pos=b:getpos() - vec2:new(0,c.r),
+		sz=b.sz + vec2:new(0,c.r*2)
+	})
+
+	if(self:p_in_b(c:getpos(),bx)) return true
+	if(self:p_in_b(c:getpos(),by)) return true
+
+	local sx = vec2:new(b.sz.x,0)
+	local sy = vec2:new(0,b.sz.y)
+
+	if(self:p_in_c(b:getpos(),c)) return true
+	if(self:p_in_c(b:getpos()+sx,c)) return true
+	if(self:p_in_c(b:getpos()+sy,c)) return true
+	if(self:p_in_c(b:getpos()+sx+sy,c)) return true
+
+	return false
+end
+
+--circle intersect poly
+function collision:c_isect_py(c,py)
+	if(self:p_in_py(c:getpos(),py)) return true
+
+	local cp = c:getpos()
+	local vs = py.vs
+	for i=1,#vs do
+		local ap = vs[i]
+		ap += py:getpos()
+		local bp = vs[i+1] or vs[1]
+		bp += py:getpos()
+
+		local ab = bp - ap
+		local ac = ap - cp
+		local n = ab:perp_ccw():normalize()
+		if(vec2.dot(ac,n) > c.r) return false
+	end
+
+	return true
 end
 
 --drawstate
@@ -536,6 +750,22 @@ function obj:new(p,t)
 	o:init()
 	
 	return o
+end
+
+-- get the class default object
+-- a.k.a. metatable
+function obj:cdo()
+	return getmetatable(self)
+end
+
+function obj:is_a(t)
+	local c = self:cdo()
+	while c do
+		if(c == t) return true
+		c = c:cdo()
+	end
+
+	return false
 end
 
 function obj:init()
@@ -658,6 +888,19 @@ function cam:update()
 	prim.update(self)
 end
 
+--cursor
+--mouse cursor
+-------------------------------
+cursor=prim:subclass({
+	name="cursor",
+	org=vec2:new()
+})
+
+function cursor:update()
+	prim.update(self)
+	self.pos = drawstate:campos() + mouse.mp
+end
+
 --graphic
 --primitive with visual element
 -------------------------------
@@ -742,21 +985,6 @@ function dot:contains(p,m)
 	local pos = self:getpos()
 	return p == pos
 end
-
---cursor
---mouse cursor
--------------------------------
-cursor=dot:subclass({
-	name="cursor",
-	org=vec2:new()
-})
-
-function cursor:update()
-	dot.update(self)
-
-	self.pos = drawstate:campos() + mouse.mp
-end
-
 
 --map
 --map graphic
@@ -907,18 +1135,7 @@ function box:contains(p,m)
 		return false
 	end
 
-	local pos = self:getpos()
-	local sz = self.sz
-
-	local x = true
-	x = x and p.x >= pos.x
-	x = x and p.x <= pos.x+sz.x
-
-	local y = true
-	y = y and p.y >= pos.y
-	y = y and p.y <= pos.y+sz.y
-
-	return x and y
+	return collision:p_in_b(p,self)
 end
 
 --circle
@@ -956,9 +1173,7 @@ function circle:contains(p,m)
 		return false
 	end
 
-	local pos = self:getpos()
-	local d = p-pos
-	return d:len() <= self.r
+	return collision:p_in_c(p,self)
 end
 
 --poly
@@ -971,7 +1186,7 @@ poly=shape:subclass({
 
 function poly:fromsprite(p,s,t)
 	t = t or {}
-	t.vs=collision.sprite_geo[tostr(s)]
+	t.vs=collision.sprite_geo[s]
 	t.cm=fget(s)
 	return poly:new(p, t)
 end
@@ -1010,27 +1225,7 @@ function poly:contains(p,m)
 		return false
 	end
 
-	local pos = self:getpos()
-	local c=true
-
-	for i=1,#self.vs do
-		local v1 = self.vs[i]
-		v1 += pos
-
-		local v2 =
-			self.vs[i+1] or self.vs[1]
-		v2 += pos
-
-		local d = (v2-v1)
-		d=d:normalize()
-		d=d:perp_ccw()
-
-		if(d:dot(p-v1)<0) then
-			c=false
-		end
-	end
-
-	return c
+	return collision:p_in_py(p,self)
 end
 
 
@@ -1066,27 +1261,12 @@ function sprite:contains(p,m)
 	if(self.s>0) then
 		local cm =
 			self.cm or fget(self.s)
+			
 		if(band(m,cm)==0) then
 			return false
 		end
 		
-		local pos = self:getpos()
-		local lpos = p-pos
-		
-		if(lpos.x < 0 or
-			lpos.y < 0) then
-			return false
-		end
-
-		if(lpos.x > self.sz.x*8 or
-			lpos.y > self.sz.y*8) then
-			return false
-		end
-	
-		--get spritesheet coords
-		local sp = sidx2pos(self.s)
-
-		return sget(sp+lpos)>0
+		return collision:p_in_s(p,self)
 	end
 
 	return false
@@ -1479,6 +1659,18 @@ function dbg_axis:draw()
 end
 
 
+function log(o)
+	local str = ""
+
+	if(type(o) == "table") then
+		str = o:tostring()
+	else
+		str = tostr(o)
+	end
+
+	d_ui.tabs["2"]:log(str)
+end
+
 
 --game
 --collection of game
@@ -1548,17 +1740,17 @@ end
 -------------------------------
 missile=prim:subclass({
 	name="missile",
-	move=nil,
 	sa=0,					--start angle
 	ss=80,				--start speed
 	d=2,						--duration
-	cm=7						--collision mask
+	cm=7,					--collision mask
+	mc=nil				--move component
 })
 
 function missile:init()
 	prim.init(self)
 	circle:new(self)
-	self.move=proj_move:new(self,{
+	self.mc=proj_move:new(self,{
 		a=self.sa,
 		s=self.ss
 	})
@@ -1566,16 +1758,16 @@ function missile:init()
 end
 
 function missile:update()
-	--self.move.a += 0.25 * dt
+	--self.mc.a += 0.25 * dt
 
 	self.d -= dt
 	if(self.d <= 0) self:destroy()
 	
 	prim.update(self)
 
-	local pos =
-		self:getpos()
-	if(bg:contains(pos, self.cm)) then
+	local pos = self:getpos()
+	local cm = self.cm
+	if(bg:contains(pos, cm)) then
 		self:destroy()
 	end
 end
@@ -1663,17 +1855,19 @@ l_tr=nil
 l_ms=nil
 
 d_ui=nil
-function log(str)
-	d_ui.tabs["2"]:log(str)
-end
 
 crs=nil
+crs_g=nil
+test=nil
 
 player=nil
 
 --initialization
 -------------------------------
 function _init()
+	--generate collision
+	collision:init()
+
 	--setup scenegraph
 	root=obj:new(nil,{
 		name="root"
@@ -1701,10 +1895,15 @@ function _init()
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
 		crs=cursor:new(l_ui)
+		
+		crs_g=circle:new(crs,{
+			r=5
+		})
+		
+		test=poly:fromsprite(l_pl,1,{
+			pos=vec2:new(32,32)
+		})
 	end
-	
-	--generate collision
-	collision:init()
 
 	--spawn player
 	local ps = bg:find_sprites(1)
@@ -1728,6 +1927,8 @@ function _update60()
 		kb:update()
 		mouse:update()
 	end
+
+	log(collision:isect(crs_g, test))
 	
 	root:update()
 end
@@ -1817,3 +2018,471 @@ __map__
 5203034051515151515151420300035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5141415151515151515151514141415100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000
+000000000000
+000000
+
+
+
+000
+000000
+
+
+
+
+
+
+
+
+
+000
+000000
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+000
+000000
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+00000000000000000000000
+000000000000
+000000
+
+
+
+000
+000000
+
+
+
+
+
+
+
+
+
+000
+000000
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+000
+000000
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
