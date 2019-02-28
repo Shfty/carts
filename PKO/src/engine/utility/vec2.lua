@@ -14,6 +14,10 @@ function vec2:new(ix,iy)
 	}, self)
 end
 
+function vec2:is_a(t)
+	return t == vec2
+end
+
 function vec2:__unm()
 	return vec2:new(
 		-self.x,

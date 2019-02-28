@@ -25,6 +25,22 @@ function obj:new(p,t)
 	return o
 end
 
+-- get the class default object
+-- a.k.a. metatable
+function obj:cdo()
+	return getmetatable(self)
+end
+
+function obj:is_a(t)
+	local c = self:cdo()
+	while c do
+		if(c == t) return true
+		c = c:cdo()
+	end
+
+	return false
+end
+
 function obj:init()
 	self.children = {}
 	obj_count+=1
