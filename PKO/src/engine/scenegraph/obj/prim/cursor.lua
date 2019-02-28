@@ -1,13 +1,12 @@
 --cursor
 --mouse cursor
 -------------------------------
-cursor=dot:subclass({
+cursor=prim:subclass({
 	name="cursor",
 	org=vec2:new()
 })
 
 function cursor:update()
-	dot.update(self)
-
+	prim.update(self)
 	self.pos = drawstate:campos() + mouse.mp
 end

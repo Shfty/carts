@@ -23,17 +23,18 @@ l_tr=nil
 l_ms=nil
 
 d_ui=nil
-function log(str)
-	d_ui.tabs["2"]:log(str)
-end
 
 crs=nil
+crs_g=nil
+test=nil
 
 player=nil
 
 --initialization
 -------------------------------
 function _init()
+	--generate collision
+
 	--setup scenegraph
 	root=obj:new(nil,{
 		name="root"
@@ -61,10 +62,15 @@ function _init()
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
 		crs=cursor:new(l_ui)
+		
+		crs_g=circle:new(crs,{
+			r=5
+		})
+		
+		test=poly:fromsprite(l_pl,1,{
+			pos=vec2:new(32,32)
+		})
 	end
-	
-	--generate collision
-	collision:init()
 
 	--spawn player
 	local ps = bg:find_sprites(1)
@@ -88,6 +94,8 @@ function _update60()
 		kb:update()
 		mouse:update()
 	end
+
+	log(collision:isect(crs_g, test))
 	
 	root:update()
 end

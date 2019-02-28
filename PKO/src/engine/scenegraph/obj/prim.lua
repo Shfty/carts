@@ -26,4 +26,5 @@ function prim:tostring()
 end
 
 require("prim/cam")
+require("prim/cursor")
 require("prim/graphic")
