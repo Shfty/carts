@@ -30,5 +30,3 @@ function dot:contains(p,m)
 	local pos = self:getpos()
 	return p == pos
 end
-
-require("dot/cursor")
