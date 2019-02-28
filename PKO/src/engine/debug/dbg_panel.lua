@@ -6,8 +6,7 @@ dbg_panel=graphic:subclass({
 	sz=vec2:new(123,115),
 	sy=0,
 	key=nil,
-	v=false,
-	c={2,10,124,116}
+	v=false
 })
 
 function dbg_panel:init()
@@ -22,10 +21,10 @@ end
 function dbg_panel:update()
 	if(not self.v) return
 	
-	if(keyp("-")) self.sy -= 114
-	if(keyp("=")) self.sy += 114
-	if(keyp("[")) self.sy -= 6
-	if(keyp("]")) self.sy += 6
+	if(kb:keyp("-")) self.sy -= 114
+	if(kb:keyp("=")) self.sy += 114
+	if(kb:keyp("[")) self.sy -= 6
+	if(kb:keyp("]")) self.sy += 6
 	
 	self.sy = max(self.sy,0)
 	

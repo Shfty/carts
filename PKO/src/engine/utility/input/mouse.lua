@@ -1,10 +1,10 @@
---mouse
--------------------------------
-mp=vec2:new()
-mb=0
+mouse = {
+	mp=vec2:new(),
+	mb=0
+}
 
-function update_mouse()
-	mp.x=stat(32)
-	mp.y=stat(33)
-	mb=stat(34)
+function mouse:update()
+	self.mp.x=stat(32)
+	self.mp.y=stat(33)
+	self.mb=stat(34)
 end

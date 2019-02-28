@@ -34,10 +34,10 @@ end
 
 function dbg_ui:update()
 	graphic.update(self)
-	self.pos=camerapos()+2
+	self.pos=drawstate:campos()+2
 	
 	for k,tab in pairs(self.tabs) do
- 	if(keyp(k)) then
+ 	if(kb:keyp(k)) then
  		if(self.at!=k) then
 				self.at=k
 				self.tw.str=tab.name

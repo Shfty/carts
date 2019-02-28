@@ -1,13 +1,13 @@
---keyboard
--------------------------------
-kp=nil
-kc=nil
+kb = {
+	kp=nil,
+	kc=nil
+}
 
-function update_kb()
-	kp=stat(30)
-	kc=stat(31)
+function kb:update()
+	self.kp=stat(30)
+	self.kc=stat(31)
 end
 
-function keyp(char)
-	return kp and kc == char
+function kb:keyp(char)
+	return self.kp and self.kc == char
 end

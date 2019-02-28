@@ -9,5 +9,5 @@ cursor=dot:subclass({
 function cursor:update()
 	dot.update(self)
 
-	self.pos = camerapos() + mp
+	self.pos = drawstate:campos() + mouse.mp
 end

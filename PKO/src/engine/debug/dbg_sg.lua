@@ -11,7 +11,8 @@ function dbg_sg:init()
 	dbg_panel.init(self)
 	
 	self.tw=text:new(self,{
-		pos=vec2:new(2,2)
+		pos=vec2:new(2,2),
+		clip={2,10,124,116}
 	})
 end
 

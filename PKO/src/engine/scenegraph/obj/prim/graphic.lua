@@ -21,7 +21,7 @@ end
 
 function graphic:g_predraw()
 	if(self.clip) then
-		self._cclip=getclip()
+		self._cclip=drawstate:getclip()
 		clip(
 			self.clip[1],
 			self.clip[2],
