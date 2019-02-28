@@ -1,5 +1,7 @@
 --logging
---wrappers for built-in print
+--log functionality and
+--wrappers for built-in
+--string and print handling
 -------------------------------
 function getcursor()
 	cr = vec2:new()
