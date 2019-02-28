@@ -26,11 +26,11 @@ vec2={
 	y=0
 }
 
-function vec2:new(ix,iy)
+function vec2:new(x,y)
 	self.__index=self
 	return setmetatable({
-		x=ix or 0,
-		y=iy or 0
+		x=x or 0,
+		y=y or 0
 	}, self)
 end
 
@@ -129,16 +129,6 @@ function vec2:__pow(rhs)
 	)
 end
 
-function vec2:__concat(rhs)
-	if(type(self)=="table") then
-		return self:tostring()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return self..rhs:tostring()
-	end
-end
-
 function vec2:__eq(rhs)
 	if(type(rhs)=="table") then
 		return flr(self.x)==flr(rhs.x) and
@@ -207,9 +197,19 @@ function vec2:lerp(tgt,d)
 	)
 end
 
-function vec2:tostring()
-	return "x:"..flr(self.x)..
-	",y:"..flr(self.y)
+function vec2:__tostr()
+	return "x:"..self.x..
+	",y:"..self.y
+end
+
+function vec2.__concat(lhs,rhs)
+	if(type(lhs)=="table") then
+		return lhs:__tostr()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return lhs..rhs:__tostr()
+	end
 end
 
 --enable color literals
@@ -448,12 +448,32 @@ end
 --wrapper for collision
 --functionality
 -------------------------------
-collision={
+resp={
+	n=vec2:new(), --normal
+	pd=0,         --penetrate dist
+	cp=vec2:new() --contact point
+}
+
+function resp:new(n,pd,cp)
+	self.__index=self
+	return setmetatable({
+		n=n or vec2:new(),
+		pd=pd or 0,
+		cp=cp or vec2:new()
+	}, self)
+end
+
+function resp:__tostr()
+	return "n:"..self.n:__tostr()..
+		",pd:"..self.pd
+end
+
+col={
 	sprite_geo={},
 	debug=false
 }
 
-function collision:init(numspr)
+function col:init(numspr)
 	numspr = numspr or 128
 
 	for i=0,numspr-1 do
@@ -474,8 +494,21 @@ function collision:init(numspr)
 end
 
 --unified collision test
-function collision:isect(a,b,_r)
+function col:isect(a,b,_r)
 	r = r or false
+
+	--dot and vec2 are
+	--interchangeable
+	if(a:is_a(dot)) then
+		a=a:getpos()
+	end
+
+	--point > point
+	if(a:is_a(vec2) and
+				b:is_a(vec2)) then
+		if (a == b) return resp:new()
+		return nil
+	end
 
 	--point > circle
 	if(a:is_a(vec2) and
@@ -522,36 +555,43 @@ function collision:isect(a,b,_r)
 	--circle > sprite
 	if(a:is_a(circle) and
 				b:is_a(sprite)) then
+		return self:c_isect_s(a,b)
 	end
 
 	--box > box
 	if(a:is_a(box) and
 				b:is_a(box)) then
+		return self:b_isect_b(a,b)
 	end
 
 	--box > poly
 	if(a:is_a(box) and
 				b:is_a(poly)) then
+		return self:b_isect_py(a,b)
 	end
 
 	--box > sprite
 	if(a:is_a(box) and
 				b:is_a(sprite)) then
+		return self:b_isect_s(a,b)
 	end
 
 	--poly > poly
 	if(a:is_a(poly) and
 				b:is_a(poly)) then
+		return self:py_isect_py(a,b)
 	end
 
 	--poly > sprite
-	if(a:is_a(box) and
+	if(a:is_a(poly) and
 				b:is_a(sprite)) then
+		return self:py_isect_s(a,b)
 	end
 
 	--sprite > sprite
 	if(a:is_a(sprite) and
 				b:is_a(sprite)) then
+		return self:s_isect_s(a,b)
 	end
 
 	--try reversing arguments
@@ -559,18 +599,30 @@ function collision:isect(a,b,_r)
 		return self:isect(b,a,true)
 	else
 		log("unsupported collision")
-		return false
 	end
 end
 
 --point in circle
-function collision:p_in_c(p,c)
-	local d = p-c:getpos()
-	return d:len() <= c.r
+function col:p_in_c(p,c)
+	local cp = c:getpos()
+	local cr = c.r
+
+	local d = p - cp
+	local dn = d:normalize()
+	local dl = d:len()
+
+	if dl <= cr then
+		local pd = cr - d:len()
+		return resp:new(
+			dn,
+			pd,
+			cp + (dn * cr)
+		)
+	end
 end
 
 --point in box
-function collision:p_in_b(p,b)
+function col:p_in_b(p,b)
 	local pos = b:getpos()
 	local sz = b.sz
 
@@ -582,11 +634,13 @@ function collision:p_in_b(p,b)
 	y = y and p.y >= pos.y
 	y = y and p.y <= pos.y+sz.y
 
-	return x and y
+	if x and y then
+		return resp:new()
+	end
 end
 
 --point in polygon
-function collision:p_in_py(p,py)
+function col:p_in_py(p,py)
 	local pos = py:getpos()
 	local c=true
 
@@ -607,38 +661,44 @@ function collision:p_in_py(p,py)
 		end
 	end
 
-	return c
+	if c then
+		return resp:new()
+	end
 end
 
 --point in sprite
-function collision:p_in_s(p,s)
+function col:p_in_s(p,s)
 	local pos = s:getpos()
 	local lpos = p-pos
 
 	if(lpos.x < 0 or
 		lpos.y < 0) then
-		return false
+		return nil
 	end
 
 	if(lpos.x > s.sz.x*8 or
 		lpos.y > s.sz.y*8) then
-		return false
+		return nil
 	end
 
 	--get spritesheet coords
 	local sp = sidx2pos(s.s)
 
-	return sget(sp+lpos)>0
+	if sget(sp+lpos) > 0 then
+		return resp:new()
+	end
 end
 
 --circle intersect circle
-function collision:c_isect_c(a,b)
+function col:c_isect_c(a,b)
 	local d = b:getpos()-a:getpos()
-	return d:len() <= a.r + b.r
+	if d:len() <= a.r + b.r then
+		return resp:new()
+	end
 end
 
 --circle intersect box
-function collision:c_isect_b(c,b)
+function col:c_isect_b(c,b)
 	local bx = box:new(nil, {
 		pos=b:getpos() - vec2:new(c.r,0),
 		sz=b.sz + vec2:new(c.r*2,0)
@@ -649,23 +709,34 @@ function collision:c_isect_b(c,b)
 		sz=b.sz + vec2:new(0,c.r*2)
 	})
 
-	if(self:p_in_b(c:getpos(),bx)) return true
-	if(self:p_in_b(c:getpos(),by)) return true
+	if(self:p_in_b(c:getpos(),bx)) then
+		return resp:new()
+	end
+	if(self:p_in_b(c:getpos(),by)) then
+		return resp:new()
+	end
 
 	local sx = vec2:new(b.sz.x,0)
 	local sy = vec2:new(0,b.sz.y)
 
-	if(self:p_in_c(b:getpos(),c)) return true
-	if(self:p_in_c(b:getpos()+sx,c)) return true
-	if(self:p_in_c(b:getpos()+sy,c)) return true
-	if(self:p_in_c(b:getpos()+sx+sy,c)) return true
-
-	return false
+	if(self:p_in_c(b:getpos(),c)) then
+		return resp:new()
+	end
+	if(self:p_in_c(b:getpos()+sx,c)) then
+		return resp:new()
+	end
+	if(self:p_in_c(b:getpos()+sy,c)) then
+		return resp:new()
+	end
+	if(self:p_in_c(b:getpos()+sx+sy,c)) then
+		return resp:new()
+	end
 end
 
 --circle intersect poly
-function collision:c_isect_py(c,py)
-	if(self:p_in_py(c:getpos(),py)) return true
+function col:c_isect_py(c,py)
+	ppy_resp = self:p_in_py(c:getpos(),py)
+	if(ppy_resp) return ppy_resp
 
 	local cp = c:getpos()
 	local vs = py.vs
@@ -678,10 +749,159 @@ function collision:c_isect_py(c,py)
 		local ab = bp - ap
 		local ac = ap - cp
 		local n = ab:perp_ccw():normalize()
-		if(vec2.dot(ac,n) > c.r) return false
+		if(vec2.dot(ac,n) > c.r) return nil
 	end
 
-	return true
+	return resp:new()
+end
+
+--circle intersect sprite
+function col:c_isect_s(c,s)
+	local sz = s.sz * 8
+	for x=0,sz.x do
+		for y=0,sz.y do
+			local pos = vec2:new(x,y)
+			pos += s:getpos()
+			if(self:p_in_c(pos, c)) then
+				return resp:new()
+			end
+		end
+	end
+end
+
+--box intersect box
+function col:b_isect_b(a,b)
+	local a1 = a:getpos()
+	local b1 = b:getpos()
+	local a2 = a1 + a.sz
+	local b2 = b1 + b.sz
+
+	return a1.x <= b2.x and
+								a2.x >= b1.x and
+								a1.y <= b2.y and
+								a2.y >= b1.y
+end
+
+--box intersect poly
+function col:b_isect_py(b,py)
+	local bp = b:getpos()
+	local bs = b.sz
+	local bc = bp + (bs/2)
+	
+	local pp = py:getpos()
+	local pc = vec2:new()
+	for v in all(py.vs) do
+		pc += v
+	end
+	pc /= #py.vs
+	pc += pp
+
+	local d = pc - bc
+	local dn = d:normalize()
+
+	local bpr = {}
+	local p = vec2.dot(bp, dn)
+	add(bpr,p)
+	p = vec2.dot(bp + vec2:new(bs.x,0),dn)
+	add(bpr,p)
+	p = vec2.dot(bp + bs,dn)
+	add(bpr,p)
+	p = vec2.dot(bp + vec2:new(0,bs.y),dn)
+	add(bpr,p)
+
+	local ppr = {}
+	for v in all(py.vs) do
+		local os = pp-pc
+		add(ppr,vec2.dot(v + os + pc,dn))
+	end
+
+	for bp in all(bpr) do
+		for pp in all(ppr) do
+			if(bp > pp) return resp:new()
+		end
+	end
+end
+
+--box intersect sprite
+function col:b_isect_s(b,s)
+	local sz = s.sz * 8
+	for x=0,sz.x do
+		for y=0,sz.y do
+			local pos = vec2:new(x,y)
+			pos += s:getpos()
+			if(self:p_in_b(pos, b)) then
+				return resp:new()
+			end
+		end
+	end
+end
+
+--poly intersect poly
+function col:py_isect_py(a,b)
+	local ap = a:getpos()
+	local ac = vec2:new()
+	for v in all(a.vs) do
+		ac += v
+	end
+	ac /= #a.vs
+	ac += ap
+
+	local bp = b:getpos()
+	local bc = vec2:new()
+	for v in all(b.vs) do
+		bc += v
+	end
+	bc /= #b.vs
+	bc += bp
+
+	local d = bc - ac
+	local dn = d:normalize()
+
+	local apr = {}
+	for v in all(a.vs) do
+		local os = ap-ac
+		add(apr,vec2.dot(v + os + ac,dn))
+	end
+
+	local bpr = {}
+	for v in all(b.vs) do
+		local os = bp-bc
+		add(bpr,vec2.dot(v + os + bc,dn))
+	end
+
+	for ap in all(apr) do
+		for bp in all(bpr) do
+			if(ap > bp) return resp:new()
+		end
+	end
+end
+
+--poly intersect sprite
+function col:py_isect_s(py,s)
+	local sz = s.sz * 8
+	for x=0,sz.x do
+		for y=0,sz.y do
+			local pos = vec2:new(x,y)
+			pos += s:getpos()
+			if(self:p_in_py(pos, py)) then
+				return resp:new()
+			end
+		end
+	end
+end
+
+--sprite intersect sprite
+function col:s_isect_s(a,b)
+	local sz = a.sz * 8
+	
+	for x=0,sz.x do
+		for y=0,sz.y do
+			local pos = vec2:new(x,y)
+			pos += a:getpos()
+
+			if(self:p_in_s(pos, b)) return resp:new()
+		end
+	end
 end
 
 --drawstate
@@ -708,15 +928,72 @@ function drawstate:getclip()
 	}
 end
 
---perf
---performance utility functions
--------------------------------
-function getfps()
+time={
+	dt=0
+}
+
+function time:init()
+	self.dt=1/self:getfpstarget()
+end
+
+function time:getfps()
 	return stat(7)
 end
 
-function getfpstarget()
+function time:getfpstarget()
 	return stat(8)
+end
+
+--logging
+--wrappers for built-in print
+-------------------------------
+function getcursor()
+	cr = vec2:new()
+	cr.x = peek(0x5f26)
+	cr.y = peek(0x5f27)
+	return cr
+end
+
+_old_tostr = tostr
+function tostr(s)
+	if(type(s) == "string") return s
+	
+	if(s.__tostr) then
+		return s:__tostr()
+	else
+		return _old_tostr(s)
+	end
+end
+
+_old_print = print
+function print(s,x,y,c)
+	s = tostr(s)
+	c = c or 7
+
+	if(x and not y) then
+		local cr = getcursor()
+		cursor(cr.x,cr.y+1)
+		return
+	end
+
+	if(not x and not y) then
+		return _old_print(s)
+	end
+
+	return _old_print(s.."\n",x,y,c)
+end
+
+log_buf = {}
+log_count = 1
+log_limit = 16
+function log(s)
+	local str = log_count..">"
+	str = s..tostr(s)
+	add(log_buf,str)
+	if(#log_buf>log_limit) then
+		del(log_buf,log_buf[1])
+	end
+	log_count = log_count + 1
 end
 
 
@@ -789,14 +1066,24 @@ function obj:remchild(c)
 	del(self.children,c)
 end
 
-function obj:tostring()
+function obj:__tostr()
 	return self.name
+end
+
+function obj.__concat(lhs, rhs)
+	if(type(lhs)=="table") then
+		return lhs:__tostr()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return lhs..rhs:__tostr()
+	end
 end
 
 function obj:print(pf)
 	pf=pf or ""
 	local str = pf
-	str=str..self:tostring()
+	str=str..self:__tostr()
 	str=str.."\n"
 	
 	for c in all(self.children) do
@@ -833,16 +1120,6 @@ function obj:destroy()
 	obj_count-=1
 end
 
-function obj:__concat(rhs)
-	if(type(self)=="table") then
-		return self:tostring()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return self..rhs:tostring()
-	end
-end
-
 --primitive
 --object with transform
 -------------------------------
@@ -864,41 +1141,10 @@ function prim:getpos()
 	return pos
 end
 
-function prim:tostring()
+function prim:__tostr()
 	return
-		obj.tostring(self).." - "..
-		self.pos:tostring()
-end
-
---cam
---primitive to control camera
--------------------------------
-cam=prim:subclass({
-	name="camera",
-	org=vec2:new(-64,-64)
-})
-
-function cam:update()
-	local pos = self:getpos()
-
-	camera(
-		pos.x,
-		pos.y
-	)
-	prim.update(self)
-end
-
---cursor
---mouse cursor
--------------------------------
-cursor=prim:subclass({
-	name="cursor",
-	org=vec2:new()
-})
-
-function cursor:update()
-	prim.update(self)
-	self.pos = drawstate:campos() + mouse.mp
+		obj.__tostr(self).." - "..
+		self.pos:__tostr()
 end
 
 --graphic
@@ -1135,7 +1381,7 @@ function box:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_b(p,self)
+	return col:p_in_b(p,self)
 end
 
 --circle
@@ -1173,7 +1419,7 @@ function circle:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_c(p,self)
+	return col:p_in_c(p,self)
 end
 
 --poly
@@ -1186,7 +1432,7 @@ poly=shape:subclass({
 
 function poly:fromsprite(p,s,t)
 	t = t or {}
-	t.vs=collision.sprite_geo[s]
+	t.vs=col.sprite_geo[s]
 	t.cm=fget(s)
 	return poly:new(p, t)
 end
@@ -1225,7 +1471,7 @@ function poly:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_py(p,self)
+	return col:p_in_py(p,self)
 end
 
 
@@ -1266,7 +1512,7 @@ function sprite:contains(p,m)
 			return false
 		end
 		
-		return collision:p_in_s(p,self)
+		return col:p_in_s(p,self)
 	end
 
 	return false
@@ -1322,6 +1568,37 @@ function text:g_draw()
 end
 
 
+--cam
+--primitive to control camera
+-------------------------------
+cam=prim:subclass({
+	name="camera",
+	org=vec2:new(-64,-64)
+})
+
+function cam:update()
+	local pos = self:getpos()
+
+	camera(
+		pos.x,
+		pos.y
+	)
+	prim.update(self)
+end
+
+--pointer
+--mouse pointer
+-------------------------------
+pointer=prim:subclass({
+	name="pointer",
+	org=vec2:new()
+})
+
+function pointer:update()
+	prim.update(self)
+	self.pos = drawstate:campos() + mouse.mp
+end
+
 
 --move
 --object for moving a parent
@@ -1349,7 +1626,7 @@ function proj_move:update()
 	self.dp = vec2:new(
 		cos(self.a),
 		sin(self.a)
-	) * self.s * dt
+	) * self.s * time.dt
 	
 	move.update(self)
 end
@@ -1369,7 +1646,7 @@ octo_move=move:subclass({
 function octo_move:update()
 	if(self.wv.x==0 and self.vx!=0) then
 		local dv=min(
-			self.dc*dt,
+			self.dc*time.dt,
 			abs(self.v.x)
 		)*sgn(self.v.x)
 		
@@ -1378,15 +1655,15 @@ function octo_move:update()
 	
 	if(self.wv.y==0 and self.v.y!=0) then
 		local dv=min(
-			self.dc*dt,
+			self.dc*time.dt,
 			abs(self.v.y)
 		)*sgn(self.v.y)
 		
 		self.v.y-=dv
 	end
 	
-	self.v.x += self.wv.x * self.ac * dt
-	self.v.y += self.wv.y * self.ac * dt
+	self.v.x += self.wv.x * self.ac * time.dt
+	self.v.y += self.wv.y * self.ac * time.dt
 
 	if(abs(self.v.x) > self.mv) then
 		self.v.x=self.mv*sgn(self.v.x)
@@ -1396,8 +1673,8 @@ function octo_move:update()
 		self.v.y=self.mv*sgn(self.v.y)
 	end
 
-	self.parent.pos.x += self.v.x * dt
-	self.parent.pos.y += self.v.y * dt
+	self.parent.pos.x += self.v.x * time.dt
+	self.parent.pos.y += self.v.y * time.dt
 	
 	move.update(self)
 end
@@ -1499,9 +1776,9 @@ function dbg_panel:update()
 	graphic.update(self)
 end
 
-function dbg_panel:tostring()
+function dbg_panel:__tostr()
 	return
-		prim.tostring(self).." "..
+		prim.__tostr(self).." "..
 		"w:"..flr(self.w)..","..
 		"w:"..flr(self.w)
 end
@@ -1538,8 +1815,8 @@ function dbg_ovr:update()
 	local tcpu = stat(1)*100
 	local scpu = stat(2)*100
 	local ucpu = tcpu-scpu
-	local fps = getfps()
-	local tfps = getfpstarget()
+	local fps = time:getfps()
+	local tfps = time:getfpstarget()
 	
 	str=str..
 		"    memory: "..mem.." kib\n"..
@@ -1561,8 +1838,6 @@ end
 dbg_log=dbg_panel:subclass({
 	name="log",
 	key="2",
-	buf={},
-	bl=30,
 	tw=nil
 })
 
@@ -1581,26 +1856,12 @@ function dbg_log:update()
 	if(not self.v) return
 	
 	local str=""
-	for s in all(self.buf) do
+	for s in all(log_buf) do
 		str = str..s.."\n"
 	end
 	
 	self.tw.pos.y=2-self.sy
 	self.tw.str=str
-end
-
-function dbg_log:log(str)
-	add(self.buf, str)
-	if(#self.buf > self.bl) then
-		del(
-			self.buf,
-			self.buf[1]
-		)
-	end
-end
-
-function dbg_log:clear()
-	self.buf={}
 end
 
 --debug scenegraph
@@ -1658,18 +1919,6 @@ function dbg_axis:draw()
 	prim.draw(self)
 end
 
-
-function log(o)
-	local str = ""
-
-	if(type(o) == "table") then
-		str = o:tostring()
-	else
-		str = tostr(o)
-	end
-
-	d_ui.tabs["2"]:log(str)
-end
 
 
 --game
@@ -1758,9 +2007,9 @@ function missile:init()
 end
 
 function missile:update()
-	--self.mc.a += 0.25 * dt
+	--self.mc.a += 0.25 * time.dt
 
-	self.d -= dt
+	self.d -= time.dt
 	if(self.d <= 0) self:destroy()
 	
 	prim.update(self)
@@ -1844,8 +2093,6 @@ debug_mode=true
 
 --variables
 -------------------------------
-dt=nil
-
 root=nil
 
 bg=nil
@@ -1856,17 +2103,21 @@ l_ms=nil
 
 d_ui=nil
 
-crs=nil
-crs_g=nil
+pnt=nil
+pnt_g=nil
 test=nil
+col_vis=nil
 
 player=nil
 
 --initialization
 -------------------------------
 function _init()
+	--calculate dt
+	time:init()
+
 	--generate collision
-	collision:init()
+	col:init()
 
 	--setup scenegraph
 	root=obj:new(nil,{
@@ -1894,15 +2145,16 @@ function _init()
 	--debug ui
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
-		crs=cursor:new(l_ui)
+		pnt=pointer:new(l_ui)
 		
-		crs_g=circle:new(crs,{
-			r=5
+		pnt_g=dot:new(pnt)
+		
+		test=circle:new(l_pl,{
+			pos=vec2:new(32,32),
+			r=4
 		})
 		
-		test=poly:fromsprite(l_pl,1,{
-			pos=vec2:new(32,32)
-		})
+		col_vis=dbg_axis:new(l_pl)
 	end
 
 	--spawn player
@@ -1918,17 +2170,18 @@ end
 --main loop
 -------------------------------
 function _update60()
-	if(dt==nil) then
-		dt=1/getfpstarget()
-	end
-	
 	controller:update()
 	if(debug_mode) then
 		kb:update()
 		mouse:update()
 	end
 
-	log(collision:isect(crs_g, test))
+	ci = col:isect(pnt_g, test)
+	if(ci) then
+		col_vis.pos = ci.cp
+	else
+		col_vis.pos = vec2:new(-8,-8)
+	end
 	
 	root:update()
 end
@@ -2018,471 +2271,252 @@ __map__
 5203034051515151515151420300035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5141415151515151515151514141415100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000
-000000000000
-000000
+00000
+
+
+
+0000
+
+
+
+00000000000000000000000000000000
+00000
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+00000000000000000000000000000000
+00000
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+
+
+
+0000
+
+
+
+00000000000000000000000000000000
+00000
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+
+
+0
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+
+
+0
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+0
+
+
+
+
+
+
+
+0000
+
+
+
+00000000000000000000000000000000
+00000
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+
+
+0
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+
+0000
+
+
+
+0
+
+
+
+0000
+
+
+
+
+
+
+0
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+0000
+
+
+
+
+
+
+0000
+
+
+
+
+0000
+
+
+
+
+
+0000
 
 
 
 000
-000000
-
-
-
-
-
-
-
-
-
-000
-000000
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-000
-000000
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-00000000000000000000000
-000000000000
-000000
-
-
-
-000
-000000
-
-
-
-
-
-
-
-
-
-000
-000000
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-000
-000000
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-000
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
