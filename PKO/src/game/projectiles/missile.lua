@@ -4,7 +4,7 @@ missile=prim:subclass({
 	sa=0,					--start angle
 	ss=80,				--start speed
 	d=2,						--duration
-	cm=1						--collision mask
+	cm=7						--collision mask
 })
 
 function missile:init()
