@@ -25,7 +25,28 @@ function obj_map:g_draw()
 	graphic.g_draw(self)
 end
 
-function obj_map:contains(p,m)
+function obj_map:find_sprites(s)
+	local coords = {}
+
+	local sx = self.mtile.x
+	local ex = sx + self.sz.x
+	local sy = self.mtile.y
+	local ey = sy + self.sz.y
+
+	for y=sy,ey-1 do
+		for x=sx,ex-1 do
+			local pos = vec2:new(x,y)
+			local ms = mget(pos)
+			if(ms == s) then
+				add(coords,pos)
+			end
+		end
+	end
+
+	return coords
+end
+
+	function obj_map:contains(p,m)
 	m = m or 255
 
 	local pos = self:getpos()

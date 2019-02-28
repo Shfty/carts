@@ -13,6 +13,11 @@ function mtile2pos(mtile)
 end
 
 _old_mget = mget
-function mget(pos)
-	return _old_mget(pos.x, pos.y)
+function mget(p)
+	return _old_mget(p.x, p.y)
+end
+
+_old_mset = mset
+function mset(p,c)
+	return _old_mset(p.x, p.y,c)
 end
