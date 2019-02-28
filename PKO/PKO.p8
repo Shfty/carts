@@ -198,6 +198,45 @@ poke(0x5f34,1)
 --enable devkit input
 poke(0x5f2d,1)
 
+controller = {
+	p=0,
+	dpad=vec2:new(),
+
+	a=false,
+	_la=false,
+	ap=false,
+	
+	b=false,
+	_lb=false,
+	bp=false
+}
+
+function controller:new(p)
+	self.__index=self
+	return setmetatable({
+		p=p or 0
+	}, self)
+end
+
+function controller:update()
+	local wx = 0
+	if(btn(0,self.p)) wx -= 1
+	if(btn(1,self.p)) wx += 1
+	self.dpad.x = wx
+
+	local wy = 0
+	if(btn(2,self.p)) wy -= 1
+	if(btn(3,self.p)) wy += 1
+	self.dpad.y = wy
+
+	self._la = self.a
+	self.a=btn(4,self.p)
+	self.ap=self.a and not self._la
+
+	self._lb = self.b
+	self.b=btn(5,self.p)
+	self.bp=self.b and not self._lb
+end
 kb = {
 	kp=nil,
 	kc=nil
@@ -1425,15 +1464,9 @@ function pko:init()
 end
 
 function pko:update()
-	local wx = 0
-	if(btn(0)) wx -= 1
-	if(btn(1)) wx += 1
+	local wv = controller.dpad
 	
-	local wy = 0
-	if(btn(2)) wy -= 1
-	if(btn(3)) wy += 1
-	
-	if(wx==0 and self.vx!=0) then
+	if(wv.x==0 and self.vx!=0) then
 		local dv=min(
 			self.dc*dt,
 			abs(self.vx)
@@ -1442,7 +1475,7 @@ function pko:update()
 		self.vx-=dv
 	end
 	
-	if(wy==0 and self.vy!=0) then
+	if(wv.y==0 and self.vy!=0) then
 		local dv=min(
 			self.dc*dt,
 			abs(self.vy)
@@ -1451,8 +1484,8 @@ function pko:update()
 		self.vy-=dv
 	end
 	
-	self.vx += wx * self.ac * dt
-	self.vy += wy * self.ac * dt
+	self.vx += wv.x * self.ac * dt
+	self.vy += wv.y * self.ac * dt
 
 	if(abs(self.vx) > self.mv) then
 		self.vx=self.mv*sgn(self.vx)
@@ -1465,7 +1498,7 @@ function pko:update()
 	self.pos.x += self.vx * dt
 	self.pos.y += self.vy * dt
 
-	if(btnp(4)) then
+	if(controller.ap) then
 		self:burst(missile,16)
 	end
  
@@ -1558,6 +1591,7 @@ function _update60()
 		dt=1/getfpstarget()
 	end
 	
+	controller:update()
 	if(debug_mode) then
 		kb:update()
 		mouse:update()
@@ -1651,6 +1685,31 @@ __map__
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000000000000000000000000000000000000000000000000000000000
 0
+
+
+
+
+
+000
+0
+
+
+
+
+
+
+
+
+
+
+
+000
+0
+
+
+
+
+
 
 
 
