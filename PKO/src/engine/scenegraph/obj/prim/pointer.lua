@@ -1,12 +1,12 @@
---cursor
---mouse cursor
+--pointer
+--mouse pointer
 -------------------------------
-cursor=prim:subclass({
-	name="cursor",
+pointer=prim:subclass({
+	name="pointer",
 	org=vec2:new()
 })
 
-function cursor:update()
+function pointer:update()
 	prim.update(self)
 	self.pos = drawstate:campos() + mouse.mp
 end
