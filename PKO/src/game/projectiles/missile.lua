@@ -21,9 +21,9 @@ function missile:init()
 end
 
 function missile:update()
-	--self.mc.a += 0.25 * dt
+	--self.mc.a += 0.25 * time.dt
 
-	self.d -= dt
+	self.d -= time.dt
 	if(self.d <= 0) self:destroy()
 	
 	prim.update(self)

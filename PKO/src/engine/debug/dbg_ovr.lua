@@ -30,8 +30,8 @@ function dbg_ovr:update()
 	local tcpu = stat(1)*100
 	local scpu = stat(2)*100
 	local ucpu = tcpu-scpu
-	local fps = getfps()
-	local tfps = getfpstarget()
+	local fps = time:getfps()
+	local tfps = time:getfpstarget()
 	
 	str=str..
 		"    memory: "..mem.." kib\n"..

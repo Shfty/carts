@@ -12,8 +12,6 @@ debug_mode=true
 
 --variables
 -------------------------------
-dt=nil
-
 root=nil
 
 bg=nil
@@ -24,17 +22,21 @@ l_ms=nil
 
 d_ui=nil
 
-crs=nil
-crs_g=nil
+pnt=nil
+pnt_g=nil
 test=nil
+col_vis=nil
 
 player=nil
 
 --initialization
 -------------------------------
 function _init()
+	--calculate dt
+	time:init()
+
 	--generate collision
-	collision:init()
+	col:init()
 
 	--setup scenegraph
 	root=obj:new(nil,{
@@ -62,15 +64,16 @@ function _init()
 	--debug ui
 	if(debug_mode) do
 		d_ui=dbg_ui:new(l_ui)
-		crs=cursor:new(l_ui)
+		pnt=pointer:new(l_ui)
 		
-		crs_g=circle:new(crs,{
-			r=5
+		pnt_g=dot:new(pnt)
+		
+		test=circle:new(l_pl,{
+			pos=vec2:new(32,32),
+			r=4
 		})
 		
-		test=poly:fromsprite(l_pl,1,{
-			pos=vec2:new(32,32)
-		})
+		col_vis=dbg_axis:new(l_pl)
 	end
 
 	--spawn player
@@ -86,17 +89,18 @@ end
 --main loop
 -------------------------------
 function _update60()
-	if(dt==nil) then
-		dt=1/getfpstarget()
-	end
-	
 	controller:update()
 	if(debug_mode) then
 		kb:update()
 		mouse:update()
 	end
 
-	log(collision:isect(crs_g, test))
+	ci = col:isect(pnt_g, test)
+	if(ci) then
+		col_vis.pos = ci.cp
+	else
+		col_vis.pos = vec2:new(-8,-8)
+	end
 	
 	root:update()
 end

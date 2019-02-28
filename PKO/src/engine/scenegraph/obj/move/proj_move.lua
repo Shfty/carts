@@ -11,7 +11,7 @@ function proj_move:update()
 	self.dp = vec2:new(
 		cos(self.a),
 		sin(self.a)
-	) * self.s * dt
+	) * self.s * time.dt
 	
 	move.update(self)
 end

@@ -13,7 +13,7 @@ octo_move=move:subclass({
 function octo_move:update()
 	if(self.wv.x==0 and self.vx!=0) then
 		local dv=min(
-			self.dc*dt,
+			self.dc*time.dt,
 			abs(self.v.x)
 		)*sgn(self.v.x)
 		
@@ -22,15 +22,15 @@ function octo_move:update()
 	
 	if(self.wv.y==0 and self.v.y!=0) then
 		local dv=min(
-			self.dc*dt,
+			self.dc*time.dt,
 			abs(self.v.y)
 		)*sgn(self.v.y)
 		
 		self.v.y-=dv
 	end
 	
-	self.v.x += self.wv.x * self.ac * dt
-	self.v.y += self.wv.y * self.ac * dt
+	self.v.x += self.wv.x * self.ac * time.dt
+	self.v.y += self.wv.y * self.ac * time.dt
 
 	if(abs(self.v.x) > self.mv) then
 		self.v.x=self.mv*sgn(self.v.x)
@@ -40,8 +40,8 @@ function octo_move:update()
 		self.v.y=self.mv*sgn(self.v.y)
 	end
 
-	self.parent.pos.x += self.v.x * dt
-	self.parent.pos.y += self.v.y * dt
+	self.parent.pos.x += self.v.x * time.dt
+	self.parent.pos.y += self.v.y * time.dt
 	
 	move.update(self)
 end
