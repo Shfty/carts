@@ -35,7 +35,7 @@ function sprite:contains(p,m)
 			return false
 		end
 		
-		return collision:p_in_s(p,self)
+		return col:p_in_s(p,self)
 	end
 
 	return false

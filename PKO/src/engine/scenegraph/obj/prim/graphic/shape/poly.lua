@@ -8,7 +8,7 @@ poly=shape:subclass({
 
 function poly:fromsprite(p,s,t)
 	t = t or {}
-	t.vs=collision.sprite_geo[s]
+	t.vs=col.sprite_geo[s]
 	t.cm=fget(s)
 	return poly:new(p, t)
 end
@@ -47,5 +47,5 @@ function poly:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_py(p,self)
+	return col:p_in_py(p,self)
 end

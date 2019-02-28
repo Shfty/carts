@@ -33,5 +33,5 @@ function circle:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_c(p,self)
+	return col:p_in_c(p,self)
 end

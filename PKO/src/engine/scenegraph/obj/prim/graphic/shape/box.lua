@@ -37,5 +37,5 @@ function box:contains(p,m)
 		return false
 	end
 
-	return collision:p_in_b(p,self)
+	return col:p_in_b(p,self)
 end
