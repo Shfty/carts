@@ -21,15 +21,9 @@ function pko:init()
 end
 
 function pko:update()
-	local wx = 0
-	if(btn(0)) wx -= 1
-	if(btn(1)) wx += 1
+	local wv = controller.dpad
 	
-	local wy = 0
-	if(btn(2)) wy -= 1
-	if(btn(3)) wy += 1
-	
-	if(wx==0 and self.vx!=0) then
+	if(wv.x==0 and self.vx!=0) then
 		local dv=min(
 			self.dc*dt,
 			abs(self.vx)
@@ -38,7 +32,7 @@ function pko:update()
 		self.vx-=dv
 	end
 	
-	if(wy==0 and self.vy!=0) then
+	if(wv.y==0 and self.vy!=0) then
 		local dv=min(
 			self.dc*dt,
 			abs(self.vy)
@@ -47,8 +41,8 @@ function pko:update()
 		self.vy-=dv
 	end
 	
-	self.vx += wx * self.ac * dt
-	self.vy += wy * self.ac * dt
+	self.vx += wv.x * self.ac * dt
+	self.vy += wv.y * self.ac * dt
 
 	if(abs(self.vx) > self.mv) then
 		self.vx=self.mv*sgn(self.vx)
@@ -61,7 +55,7 @@ function pko:update()
 	self.pos.x += self.vx * dt
 	self.pos.y += self.vy * dt
 
-	if(btnp(4)) then
+	if(controller.ap) then
 		self:burst(missile,16)
 	end
  

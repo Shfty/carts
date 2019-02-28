@@ -79,6 +79,7 @@ function _update60()
 		dt=1/getfpstarget()
 	end
 	
+	controller:update()
 	if(debug_mode) then
 		kb:update()
 		mouse:update()
