@@ -3,17 +3,17 @@
 -------------------------------
 missile=prim:subclass({
 	name="missile",
-	move=nil,
 	sa=0,					--start angle
 	ss=80,				--start speed
 	d=2,						--duration
-	cm=7						--collision mask
+	cm=7,					--collision mask
+	mc=nil				--move component
 })
 
 function missile:init()
 	prim.init(self)
 	circle:new(self)
-	self.move=proj_move:new(self,{
+	self.mc=proj_move:new(self,{
 		a=self.sa,
 		s=self.ss
 	})
@@ -21,16 +21,16 @@ function missile:init()
 end
 
 function missile:update()
-	--self.move.a += 0.25 * dt
+	--self.mc.a += 0.25 * dt
 
 	self.d -= dt
 	if(self.d <= 0) self:destroy()
 	
 	prim.update(self)
 
-	local pos =
-		self:getpos()
-	if(bg:contains(pos, self.cm)) then
+	local pos = self:getpos()
+	local cm = self.cm
+	if(bg:contains(pos, cm)) then
 		self:destroy()
 	end
 end
