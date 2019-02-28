@@ -11,20 +11,5 @@ function move:update()
 	self.dp=vec2:new()
 end
 
---move_p
---projectile move
--------------------------------
-move_p=obj:subclass({
-	name="projectile move",
-	a=0,
-	s=80
-})
-
-function move_p:update()
-	self.dp = vec2:new(
-		cos(self.a),
-		sin(self.a)
-	) * self.s * dt
-	
-	move.update(self)
-end
+require("move/proj_move")
+require("move/octo_move")

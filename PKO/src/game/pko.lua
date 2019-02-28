@@ -1,11 +1,7 @@
 pko=prim:subclass({
 	name="pko",
 	pos=vec2:new(64,64),
-	vx=0,
-	vy=0,
-	ac=600,
-	dc=600,
-	mv=60,
+	mc=nil,	--move component
 	sc=nil,	--sprite component
 	tc=nil,	--trail component
 	cc=nil		--camera component
@@ -13,6 +9,7 @@ pko=prim:subclass({
 
 function pko:init()
 	prim.init(self)
+	self.mc=octo_move:new(self)
 	self.sc=sprite:new(self,{
 		s=1
 	})
@@ -21,39 +18,7 @@ function pko:init()
 end
 
 function pko:update()
-	local wv = controller.dpad
-	
-	if(wv.x==0 and self.vx!=0) then
-		local dv=min(
-			self.dc*dt,
-			abs(self.vx)
-		)*sgn(self.vx)
-		
-		self.vx-=dv
-	end
-	
-	if(wv.y==0 and self.vy!=0) then
-		local dv=min(
-			self.dc*dt,
-			abs(self.vy)
-		)*sgn(self.vy)
-		
-		self.vy-=dv
-	end
-	
-	self.vx += wv.x * self.ac * dt
-	self.vy += wv.y * self.ac * dt
-
-	if(abs(self.vx) > self.mv) then
-		self.vx=self.mv*sgn(self.vx)
-	end
-	
-	if(abs(self.vy) > self.mv) then
-		self.vy=self.mv*sgn(self.vy)
-	end
-
-	self.pos.x += self.vx * dt
-	self.pos.y += self.vy * dt
+	self.mc.wv=controller.dpad
 
 	if(controller.ap) then
 		self:burst(missile,16)

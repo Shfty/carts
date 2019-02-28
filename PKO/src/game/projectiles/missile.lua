@@ -10,7 +10,7 @@ missile=prim:subclass({
 function missile:init()
 	prim.init(self)
 	circle:new(self)
-	self.move=move_p:new(self,{
+	self.move=proj_move:new(self,{
 		a=self.sa,
 		s=self.ss
 	})
