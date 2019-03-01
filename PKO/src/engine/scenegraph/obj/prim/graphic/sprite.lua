@@ -22,21 +22,3 @@ function sprite:g_draw()
 	
 	graphic.g_draw(self)
 end
-
-function sprite:contains(p,m)
-	m = m or 255
-
-	--if a sprite is present
-	if(self.s>0) then
-		local cm =
-			self.cm or fget(self.s)
-			
-		if(band(m,cm)==0) then
-			return false
-		end
-		
-		return col:p_in_s(p,self)
-	end
-
-	return false
-end

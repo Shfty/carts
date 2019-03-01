@@ -25,13 +25,3 @@ function circle:draw_stroke()
  	self.sc
  )
 end
-
-function circle:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	return col:p_in_c(p,self)
-end

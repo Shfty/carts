@@ -19,14 +19,3 @@ function dot:g_draw()
 	
 	graphic.g_draw(self)
 end
-
-function dot:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	local pos = self:getpos()
-	return p == pos
-end

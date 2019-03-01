@@ -29,13 +29,3 @@ function box:draw_stroke()
  	self.sc
  )
 end
-
-function box:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	return col:p_in_b(p,self)
-end

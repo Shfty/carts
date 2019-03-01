@@ -46,7 +46,8 @@ function obj_map:find_sprites(s)
 	return coords
 end
 
-	function obj_map:contains(p,m)
+--todo: refactor into unified collision
+function obj_map:contains(p,m)
 	m = m or 255
 
 	local pos = self:getpos()
