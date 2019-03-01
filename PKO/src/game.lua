@@ -44,9 +44,7 @@ function _init()
 	})
 
 	bg=obj_map:new(root,{
-		name="background",
-		w=16,
-		h=16
+		name="background"
 	})
 	
 	l_pl=obj:new(root,{
@@ -66,14 +64,16 @@ function _init()
 		d_ui=dbg_ui:new(l_ui)
 		pnt=pointer:new(l_ui)
 		
-		pnt_g=dot:new(pnt)
-		
-		test=circle:new(l_pl,{
-			pos=vec2:new(32,32),
-			r=4
+		pnt_g=box:new(pnt,{
+			sz=vec2:new(16,8)
 		})
 		
-		col_vis=dbg_axis:new(l_pl)
+		test=poly:fromsprite(l_ui,1,{
+			pos=vec2:new(32,32),
+			sz=vec2:new(16,8)
+		})
+		
+		col_vis=dbg_axis:new(l_ui)
 	end
 
 	--spawn player
@@ -97,9 +97,12 @@ function _update60()
 
 	ci = col:isect(pnt_g, test)
 	if(ci) then
+		pnt_g.pos -= ci.n * ci.pd
 		col_vis.pos = ci.cp
+		col_vis.a = atan2(ci.n)
 	else
 		col_vis.pos = vec2:new(-8,-8)
+		col_vis.a = 0
 	end
 	
 	root:update()
