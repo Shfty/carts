@@ -154,11 +154,17 @@ function vec2:normalize()
 	return self/self:len()
 end
 
-function vec2:perp_ccw()
-	return vec2:new(-self.y,self.x)
+function vec2:rotate(a)
+	local x = self.x * cos(a) + self.y * sin(a)
+	local y = -self.x * sin(a) + self.y * cos(a)
+	return vec2:new(x,y)
 end
 
 function vec2:perp_cw()
+	return vec2:new(-self.y,self.x)
+end
+
+function vec2:perp_ccw()
 	return vec2:new(self.y,-self.x)
 end
 
