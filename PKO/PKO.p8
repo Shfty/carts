@@ -14,10 +14,17 @@ __lua__
 --math
 --utility math functions
 -------------------------------
+pi=3.14159
+tau=2*pi
+
 function lerp(a,b,d)
 	return a+d*(b-a)
 end
 
+_old_atan2 = atan2
+function atan2(v)
+	return _old_atan2(v.y,v.x)
+end
 --vec2
 --two dimensional vector
 -------------------------------
@@ -174,11 +181,17 @@ function vec2:normalize()
 	return self/self:len()
 end
 
-function vec2:perp_ccw()
-	return vec2:new(-self.y,self.x)
+function vec2:rotate(a)
+	local x = self.x * cos(a) + self.y * sin(a)
+	local y = -self.x * sin(a) + self.y * cos(a)
+	return vec2:new(x,y)
 end
 
 function vec2:perp_cw()
+	return vec2:new(-self.y,self.x)
+end
+
+function vec2:perp_ccw()
 	return vec2:new(self.y,-self.x)
 end
 
@@ -215,6 +228,15 @@ end
 --enable color literals
 poke(0x5f34,1)
 
+_old_line = line
+function line(a,b,c)
+	return _old_line(
+		a.x,
+		a.y,
+		b.x,
+		b.y,
+		c)
+end
 --input
 --collection of input wrappers
 -------------------------------
@@ -503,13 +525,6 @@ function col:isect(a,b,_r)
 		a=a:getpos()
 	end
 
-	--point > point
-	if(a:is_a(vec2) and
-				b:is_a(vec2)) then
-		if (a == b) return resp:new()
-		return nil
-	end
-
 	--point > circle
 	if(a:is_a(vec2) and
 				b:is_a(circle)) then
@@ -552,12 +567,6 @@ function col:isect(a,b,_r)
 		return self:c_isect_py(a,b)
 	end
 
-	--circle > sprite
-	if(a:is_a(circle) and
-				b:is_a(sprite)) then
-		return self:c_isect_s(a,b)
-	end
-
 	--box > box
 	if(a:is_a(box) and
 				b:is_a(box)) then
@@ -570,33 +579,22 @@ function col:isect(a,b,_r)
 		return self:b_isect_py(a,b)
 	end
 
-	--box > sprite
-	if(a:is_a(box) and
-				b:is_a(sprite)) then
-		return self:b_isect_s(a,b)
-	end
-
 	--poly > poly
 	if(a:is_a(poly) and
 				b:is_a(poly)) then
 		return self:py_isect_py(a,b)
 	end
 
-	--poly > sprite
-	if(a:is_a(poly) and
-				b:is_a(sprite)) then
-		return self:py_isect_s(a,b)
-	end
-
-	--sprite > sprite
-	if(a:is_a(sprite) and
-				b:is_a(sprite)) then
-		return self:s_isect_s(a,b)
-	end
-
 	--try reversing arguments
 	if not _r then
-		return self:isect(b,a,true)
+		local rev = self:isect(b,a,true)
+		if(rev) then
+			rev.n = -rev.n
+			rev.pd = -rev.pd
+			log(rev.n)
+			rev.cp += rev.n * rev.pd
+		end
+		return rev
 	else
 		log("unsupported collision")
 	end
@@ -607,63 +605,139 @@ function col:p_in_c(p,c)
 	local cp = c:getpos()
 	local cr = c.r
 
-	local d = p - cp
+	local d = cp - p
 	local dn = d:normalize()
 	local dl = d:len()
 
 	if dl <= cr then
-		local pd = cr - d:len()
+		local pd = cr - dl
+		log(pd)
 		return resp:new(
 			dn,
 			pd,
-			cp + (dn * cr)
+			cp + (-dn * cr)
 		)
 	end
 end
 
 --point in box
 function col:p_in_b(p,b)
-	local pos = b:getpos()
-	local sz = b.sz
+	local bp = b:getpos()
+	local bs = b.sz
+	local bc = bp + (bs/2)
 
 	local x = true
-	x = x and p.x >= pos.x
-	x = x and p.x <= pos.x+sz.x
+	x = x and p.x >= bp.x
+	x = x and p.x <= bp.x+bs.x
 
 	local y = true
-	y = y and p.y >= pos.y
-	y = y and p.y <= pos.y+sz.y
+	y = y and p.y >= bp.y
+	y = y and p.y <= bp.y+bs.y
 
 	if x and y then
-		return resp:new()
+		local d = p-bc
+
+		local n = vec2:new()
+		local pd = 0
+		local cp = 0
+
+		if(abs(d.x * (bs.y/bs.x)) > abs(d.y)) then
+			n.x = sgn(d.x)
+			pd=(bs.x*0.5) - abs(d.x)
+			cp = bc + vec2:new(sgn(d.x) * bs.x * 0.5,d.y)
+		else
+			n.y = sgn(d.y)
+			pd=(bs.y*0.5) - abs(d.y)
+			cp = bc + vec2:new(d.x,sgn(d.y) * bs.y * 0.5)
+		end
+
+		return resp:new(
+			n,
+			pd,
+			cp
+		)
 	end
+end
+
+function col:py_resp(p,py)
+	local pp = py:getpos()
+	local pc = py:center()
+	local li = 0
+
+	for i=1,#py.vs do
+		local v1 = py.vs[i]
+		v1 += pp
+
+		local v2 =
+			py.vs[i+1] or py.vs[1]
+		v2 += pp
+
+		local rp = p-pc
+		local rv1 = v1-pc
+		local rv2 = v2-pc
+
+		local pa = atan2(rp)
+		local v1a = atan2(rv1)
+		local v2a = atan2(rv2)
+
+		if v1a < v2a then
+			if pa >= v1a and pa <= v2a then
+				li = i
+				break
+			end
+		else
+			if pa >= v1a or pa <= v2a then
+				li = i
+				break
+			end
+		end
+	end
+	
+	local v1 = py.vs[li]
+	v1 += pp
+
+	local v2 =
+		py.vs[li+1] or py.vs[1]
+	v2 += pp
+
+	local d = v2-v1
+	local dn = d:normalize()
+	local rp = p-v1
+	local pp = dn:dot(rp)
+
+	local n = dn:perp_ccw()
+	local pd = n:dot(rp)
+
+	return resp:new(
+		n,
+		pd,
+		v1 + dn*pp
+	)
 end
 
 --point in polygon
 function col:p_in_py(p,py)
-	local pos = py:getpos()
+	local pp = py:getpos()
 	local c=true
 
 	for i=1,#py.vs do
 		local v1 = py.vs[i]
-		v1 += pos
+		v1 += pp
 
 		local v2 =
 			py.vs[i+1] or py.vs[1]
-		v2 += pos
+		v2 += pp
 
-		local d = (v2-v1)
+		local d = v2-v1
 		d=d:normalize()
-		d=d:perp_ccw()
+		local n=d:perp_ccw()
 
-		if(d:dot(p-v1)<0) then
+		if(n:dot(p-v1)>0) then
 			c=false
 		end
 	end
 
-	if c then
-		return resp:new()
-	end
+	if(c) return self:py_resp(p,py)
 end
 
 --point in sprite
@@ -691,45 +765,76 @@ end
 
 --circle intersect circle
 function col:c_isect_c(a,b)
-	local d = b:getpos()-a:getpos()
-	if d:len() <= a.r + b.r then
-		return resp:new()
+	local ap = a:getpos()
+	local bp = b:getpos()
+	local d = ap-bp
+	local dl = d:len()
+	local dn = d:normalize();
+	local tr = a.r + b.r
+	if dl <= tr then
+		return resp:new(
+			dn,
+			tr-dl,
+			bp + dn * b.r
+		)
 	end
 end
 
 --circle intersect box
 function col:c_isect_b(c,b)
+	local cp = c:getpos()
+	local bp = b:getpos()
+
+	local p_resp = self:p_in_b(cp,b)
+	if(p_resp) return p_resp
+
 	local bx = box:new(nil, {
-		pos=b:getpos() - vec2:new(c.r,0),
+		pos=bp - vec2:new(c.r,0),
 		sz=b.sz + vec2:new(c.r*2,0)
 	})
 
+	local bx_resp = self:p_in_b(cp,bx)
+	if(bx_resp) then
+		bx_resp.cp.x += c.r * sgn((bp-cp).x)
+		return bx_resp
+	end
+
 	local by = box:new(nil, {
-		pos=b:getpos() - vec2:new(0,c.r),
+		pos=bp - vec2:new(0,c.r),
 		sz=b.sz + vec2:new(0,c.r*2)
 	})
 
-	if(self:p_in_b(c:getpos(),bx)) then
-		return resp:new()
-	end
-	if(self:p_in_b(c:getpos(),by)) then
-		return resp:new()
+	local by_resp = self:p_in_b(cp,by)
+	if(by_resp) then
+		by_resp.cp.y += c.r * sgn((bp-cp).y)
+		return by_resp
 	end
 
 	local sx = vec2:new(b.sz.x,0)
 	local sy = vec2:new(0,b.sz.y)
 
-	if(self:p_in_c(b:getpos(),c)) then
-		return resp:new()
+	local tl_resp = self:p_in_c(bp,c)
+	if(tl_resp) then
+		tl_resp.cp=bp
+		return tl_resp
 	end
-	if(self:p_in_c(b:getpos()+sx,c)) then
-		return resp:new()
+
+	local tr_resp = self:p_in_c(bp+sx,c)
+	if(tr_resp) then
+		tr_resp.cp=bp+sx
+		return tr_resp
 	end
-	if(self:p_in_c(b:getpos()+sy,c)) then
-		return resp:new()
+
+	local bl_resp = self:p_in_c(bp+sy,c)
+	if(bl_resp) then
+		bl_resp.cp=bp+sy
+		return bl_resp
 	end
-	if(self:p_in_c(b:getpos()+sx+sy,c)) then
-		return resp:new()
+
+	local br_resp = self:p_in_c(bp+sx+sy,c)
+	if(br_resp) then
+		br_resp.cp=bp+sx+sy
+		return br_resp
 	end
 end
 
@@ -746,27 +851,71 @@ function col:c_isect_py(c,py)
 		local bp = vs[i+1] or vs[1]
 		bp += py:getpos()
 
-		local ab = bp - ap
+		local ab = ap - bp
 		local ac = ap - cp
 		local n = ab:perp_ccw():normalize()
 		if(vec2.dot(ac,n) > c.r) return nil
 	end
 
-	return resp:new()
-end
+	local pp = py:getpos()
+	local pc = py:center()
+	local li = 0
 
---circle intersect sprite
-function col:c_isect_s(c,s)
-	local sz = s.sz * 8
-	for x=0,sz.x do
-		for y=0,sz.y do
-			local pos = vec2:new(x,y)
-			pos += s:getpos()
-			if(self:p_in_c(pos, c)) then
-				return resp:new()
+	for i=1,#py.vs do
+		local v1 = py.vs[i]
+		v1 += pp
+
+		local v2 =
+			py.vs[i+1] or py.vs[1]
+		v2 += pp
+
+		local rp = cp-pc
+		local rv1 = v1-pc
+		local rv2 = v2-pc
+
+		local pa = atan2(rp)
+		local v1a = atan2(rv1)
+		local v2a = atan2(rv2)
+
+		if v1a < v2a then
+			if pa >= v1a and pa <= v2a then
+				li = i
+				break
+			end
+		else
+			if pa >= v1a or pa <= v2a then
+				li = i
+				break
 			end
 		end
 	end
+	
+	local v1 = py.vs[li]
+	v1 += pp
+
+	local v2 =
+		py.vs[li+1] or py.vs[1]
+	v2 += pp
+
+	local d = v2-v1
+	local dn = d:normalize()
+	local rp = cp-v1
+	local pp = dn:dot(rp)
+
+	local n = dn:perp_ccw()
+	local pd = -n:dot(cp-v1)
+
+	local con = v1 +
+		dn*min(max(pp,0),d:len())
+
+		local pd = c.r-(cp-con):len()
+		log(pd)
+
+	return resp:new(
+		(cp-con):normalize(),
+		-pd,
+		con
+	)
 end
 
 --box intersect box
@@ -776,10 +925,40 @@ function col:b_isect_b(a,b)
 	local a2 = a1 + a.sz
 	local b2 = b1 + b.sz
 
-	return a1.x <= b2.x and
-								a2.x >= b1.x and
-								a1.y <= b2.y and
-								a2.y >= b1.y
+	local isect = a1.x <= b2.x and
+															a2.x >= b1.x and
+															a1.y <= b2.y and
+															a2.y >= b1.y
+
+	if isect then
+		local mib = vec2:new(min(a1.x,b1.x),min(a1.y,b1.y))
+		local mab = vec2:new(max(a2.x,b2.x),max(a2.y,b2.y))
+		local ic = (mib+mab)/2
+		local bs = b.sz
+		local bc = b1 + (bs/2)
+
+		local d = ic-bc
+
+		local n = vec2:new()
+		local pd = 0
+		local cp = 0
+
+		if(abs(d.x * (bs.y/bs.x)) >= abs(d.y)) then
+			n.x = bs.x*0.5*sgn(d.x)
+			pd=abs(d.x) - (bs.x*0.5)
+			cp = bc + vec2:new(sgn(d.x) * bs.x * 0.5,d.y)
+		else
+			n.y = bs.y*0.5*sgn(d.y)
+			pd=abs(d.y) - (bs.y*0.5)
+			cp = bc + vec2:new(d.x,sgn(d.y) * bs.y * 0.5)
+		end
+
+		return resp:new(
+			n,
+			pd,
+			cp
+		)
+	end
 end
 
 --box intersect poly
@@ -789,50 +968,40 @@ function col:b_isect_py(b,py)
 	local bc = bp + (bs/2)
 	
 	local pp = py:getpos()
-	local pc = vec2:new()
-	for v in all(py.vs) do
-		pc += v
-	end
-	pc /= #py.vs
-	pc += pp
+	local pc = py:center()
 
 	local d = pc - bc
 	local dn = d:normalize()
 
-	local bpr = {}
-	local p = vec2.dot(bp, dn)
-	add(bpr,p)
-	p = vec2.dot(bp + vec2:new(bs.x,0),dn)
-	add(bpr,p)
-	p = vec2.dot(bp + bs,dn)
-	add(bpr,p)
-	p = vec2.dot(bp + vec2:new(0,bs.y),dn)
-	add(bpr,p)
+	local bmax = nil
+	local p = dn:dot(bp-bc)
+	if bmax==nil or bmax < p then
+		bmax=p
+	end
+	p = dn:dot(bp + vec2:new(bs.x,0)-bc)
+	if bmax==nil or bmax < p then
+		bmax=p
+	end
+	p = dn:dot(bp + bs-bc)
+	if bmax==nil or bmax < p then
+		bmax=p
+	end
+	p = dn:dot(bp + vec2:new(0,bs.y)-bc)
+	if bmax==nil or bmax < p then
+		bmax=p
+	end
 
-	local ppr = {}
+	pmin = nil
 	for v in all(py.vs) do
-		local os = pp-pc
-		add(ppr,vec2.dot(v + os + pc,dn))
-	end
-
-	for bp in all(bpr) do
-		for pp in all(ppr) do
-			if(bp > pp) return resp:new()
+		local c = dn:dot(v + pp - bc)
+		if pmin==nil or pmin > c then
+			pmin=c
 		end
 	end
-end
 
---box intersect sprite
-function col:b_isect_s(b,s)
-	local sz = s.sz * 8
-	for x=0,sz.x do
-		for y=0,sz.y do
-			local pos = vec2:new(x,y)
-			pos += s:getpos()
-			if(self:p_in_b(pos, b)) then
-				return resp:new()
-			end
-		end
+	if(bmax > pmin) then
+		ic = bc+(dn * ((bmax+pmin)/2))
+		return self:py_resp(ic,py)
 	end
 end
 
@@ -857,22 +1026,25 @@ function col:py_isect_py(a,b)
 	local d = bc - ac
 	local dn = d:normalize()
 
-	local apr = {}
+	local amax = nil
 	for v in all(a.vs) do
-		local os = ap-ac
-		add(apr,vec2.dot(v + os + ac,dn))
-	end
-
-	local bpr = {}
-	for v in all(b.vs) do
-		local os = bp-bc
-		add(bpr,vec2.dot(v + os + bc,dn))
-	end
-
-	for ap in all(apr) do
-		for bp in all(bpr) do
-			if(ap > bp) return resp:new()
+		local apr = dn:dot(v+ap-ac)
+		if amax==nil or amax < apr then
+			amax = apr
 		end
+	end
+
+	local bmin = nil
+	for v in all(b.vs) do
+		local bpr = dn:dot(v+bp-ac)
+		if bmin==nil or bmin > bpr then
+			bmin = bpr
+		end
+	end
+
+	if(amax > bmin) then
+		local ic = ac + (dn*amax)
+		return self:py_resp(ic,b)
 	end
 end
 
@@ -886,20 +1058,6 @@ function col:py_isect_s(py,s)
 			if(self:p_in_py(pos, py)) then
 				return resp:new()
 			end
-		end
-	end
-end
-
---sprite intersect sprite
-function col:s_isect_s(a,b)
-	local sz = a.sz * 8
-	
-	for x=0,sz.x do
-		for y=0,sz.y do
-			local pos = vec2:new(x,y)
-			pos += a:getpos()
-
-			if(self:p_in_s(pos, b)) return resp:new()
 		end
 	end
 end
@@ -945,7 +1103,9 @@ function time:getfpstarget()
 end
 
 --logging
---wrappers for built-in print
+--log functionality and
+--wrappers for built-in
+--string and print handling
 -------------------------------
 function getcursor()
 	cr = vec2:new()
@@ -956,7 +1116,13 @@ end
 
 _old_tostr = tostr
 function tostr(s)
-	if(type(s) == "string") return s
+	if(type(s) == "string") then
+		return s
+	end
+
+	if(type(s) == "number") then
+		return _old_tostr(s)
+	end
 	
 	if(s.__tostr) then
 		return s:__tostr()
@@ -988,7 +1154,7 @@ log_count = 1
 log_limit = 16
 function log(s)
 	local str = log_count..">"
-	str = s..tostr(s)
+	str = str..tostr(s)
 	add(log_buf,str)
 	if(#log_buf>log_limit) then
 		del(log_buf,log_buf[1])
@@ -1125,8 +1291,9 @@ end
 -------------------------------
 prim=obj:subclass({
 	name="primitive",
-	pos=vec2:new(),
-	org=vec2:new()
+	pos=vec2:new(),			--position
+	org=vec2:new(),			--origin
+	a=0															--angle
 })
 
 function prim:getpos()
@@ -1195,8 +1362,9 @@ function graphic:g_postdraw()
 	end
 end
 
-function graphic:contains(p,m)
-	return false
+function graphic:col_mask(m)
+	m = m or 255
+	return band(self.cm,m) > 0
 end
 
 --dot
@@ -1219,17 +1387,6 @@ function dot:g_draw()
  )
 	
 	graphic.g_draw(self)
-end
-
-function dot:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	local pos = self:getpos()
-	return p == pos
 end
 
 --map
@@ -1280,7 +1437,8 @@ function obj_map:find_sprites(s)
 	return coords
 end
 
-	function obj_map:contains(p,m)
+--todo: refactor into unified collision
+function obj_map:contains(p,m)
 	m = m or 255
 
 	local pos = self:getpos()
@@ -1374,16 +1532,6 @@ function box:draw_stroke()
  )
 end
 
-function box:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	return col:p_in_b(p,self)
-end
-
 --circle
 --circle shape
 -------------------------------
@@ -1412,16 +1560,6 @@ function circle:draw_stroke()
  )
 end
 
-function circle:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
-	end
-
-	return col:p_in_c(p,self)
-end
-
 --poly
 --n-sided shape
 -------------------------------
@@ -1448,13 +1586,7 @@ function poly:draw_stroke()
 			self.vs[i+1] or self.vs[1]
 		v2 += pos
 
-		line(
-			v1.x,
-			v1.y,
-			v2.x,
-			v2.y,
-			self.sc
-		)
+		line(v1,v2,self.sc)
 	end
 
 	for i=1,#self.vs do
@@ -1464,14 +1596,14 @@ function poly:draw_stroke()
 
 end
 
-function poly:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
+function poly:center()
+	local pc = vec2:new()
+	for v in all(self.vs) do
+		pc += v
 	end
-
-	return col:p_in_py(p,self)
+	pc /= #self.vs
+	pc += self:getpos()
+	return pc
 end
 
 
@@ -1500,24 +1632,6 @@ function sprite:g_draw()
 	graphic.g_draw(self)
 end
 
-function sprite:contains(p,m)
-	m = m or 255
-
-	--if a sprite is present
-	if(self.s>0) then
-		local cm =
-			self.cm or fget(self.s)
-			
-		if(band(m,cm)==0) then
-			return false
-		end
-		
-		return col:p_in_s(p,self)
-	end
-
-	return false
-end
-
 --stripe
 --line graphic
 -------------------------------
@@ -1534,13 +1648,7 @@ function stripe:g_draw()
 	local pos = self:getpos()
 	local t = self.tp
 	if(not self.at) t += pos
-	line(
-		pos.x,
-		pos.y,
-		t.x,
-		t.y,
- 	self.c
- )
+	line(pos,t,self.c)
 	
 	graphic.g_draw(self)
 end
@@ -1894,26 +2002,27 @@ end
 --debug coordinate axis
 -------------------------------
 dbg_axis=prim:subclass({
-	name="debug axis"
+	name="debug axis",
+	axis=vec2:new(0,1),
+	sz=5,
+	a=0
 })
 
 function dbg_axis:draw()
 	local pos=self:getpos()
 
+	local o = (self.axis*self.sz):rotate(self.a)
+
 	line(
-		pos.x,
-		pos.y,
-		pos.x+5,
-		pos.y,
+		pos,
+		pos + o,
 		12
 	)
-	
+
 	line(
-		pos.x,
-		pos.y,
-		pos.x,
-		pos.y+5,
-		11
+		pos,
+		pos + o:perp_ccw(),
+		8
 	)
 	
 	prim.draw(self)
@@ -1974,7 +2083,7 @@ function trail:g_draw()
 
 		local fp=self.ds[i]
 		local tp=self.ds[i+1] or self:getpos()
-		line(fp.x,fp.y,tp.x,tp.y,c)
+		line(fp,tp,c)
 	end
 	
 	graphic.g_draw(self)
@@ -2125,9 +2234,7 @@ function _init()
 	})
 
 	bg=obj_map:new(root,{
-		name="background",
-		w=16,
-		h=16
+		name="background"
 	})
 	
 	l_pl=obj:new(root,{
@@ -2147,14 +2254,16 @@ function _init()
 		d_ui=dbg_ui:new(l_ui)
 		pnt=pointer:new(l_ui)
 		
-		pnt_g=dot:new(pnt)
-		
-		test=circle:new(l_pl,{
-			pos=vec2:new(32,32),
-			r=4
+		pnt_g=box:new(pnt,{
+			sz=vec2:new(16,8)
 		})
 		
-		col_vis=dbg_axis:new(l_pl)
+		test=poly:fromsprite(l_ui,1,{
+			pos=vec2:new(32,32),
+			sz=vec2:new(16,8)
+		})
+		
+		col_vis=dbg_axis:new(l_ui)
 	end
 
 	--spawn player
@@ -2178,9 +2287,12 @@ function _update60()
 
 	ci = col:isect(pnt_g, test)
 	if(ci) then
+		pnt_g.pos -= ci.n * ci.pd
 		col_vis.pos = ci.cp
+		col_vis.a = atan2(ci.n)
 	else
 		col_vis.pos = vec2:new(-8,-8)
+		col_vis.a = 0
 	end
 	
 	root:update()
@@ -2271,20 +2383,43 @@ __map__
 5203034051515151515151420300035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5141415151515151515151514141415100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-00000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000
+0
+0000000000000000000
+0000000000000000000000
+0
+00000000
+0
+
+0
+0
+00000000
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
 
 
-
-0000
-
-
-
-00000000000000000000000000000000
-00000
-
-
-
-0000
+0
 
 
 
@@ -2292,21 +2427,23 @@ __map__
 
 
 
-0000
+0
 
 
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
 
 
-0000
-
-
-
-00000000000000000000000000000000
-00000
-
-
-
-0000
+0
 
 
 
@@ -2314,24 +2451,39 @@ __map__
 
 
 
-0000
+0
+0
+0
+00000000
+0
+
+0
+0
+00000000
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
 
 
-
-
-
-
-
-0000
-
-
-
-00000000000000000000000000000000
-00000
-
-
-
-0000
+0
 
 
 
@@ -2339,67 +2491,27 @@ __map__
 
 
 
-0000
+0
 
 
+0
 
+0
+0
 
+0
+0
+
+0
+
+0
 
 
 0
 
 
 
-0000
-
-
-
-
-0000
-
-
-
-
-
-
-0000
-
-
-
 0
-
-
-
-0000
-
-
-
-
-
-
-0
-
-
-
-0000
-
-
-
-
-0000
-
-
-
-
-
-
-
-0000
-
-
-
-
-0000
 
 
 
@@ -2408,19 +2520,44 @@ __map__
 
 
 
+0
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000
+0
+0000000000000000000
+0000000000000000000000
+0
+00000000
+0
+
+0
+0
+00000000
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
 
 
-
-0000
-
-
-
-00000000000000000000000000000000
-00000
-
-
-
-0000
+0
 
 
 
@@ -2428,7 +2565,181 @@ __map__
 
 
 
-0000
+0
+
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+0
+0
+00000000
+0
+
+0
+0
+00000000
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+0
+
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+
+
+
+0
+
+0
+
+
 
 
 
@@ -2439,19 +2750,26 @@ __map__
 
 
 
-0000
+
+0
+
+0
 
 
 
 
-0000
 
 
 
 
 
 
-0000
+
+
+
+
+
+
 
 
 
@@ -2459,7 +2777,46 @@ __map__
 
 
 
-0000
+
+
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2470,53 +2827,1269 @@ __map__
 
 
 
-0000
 
+0
 
-
-
-0000
-
-
-
-
-
-
-
-0000
-
-
-
-
-0000
-
-
-
-
-
-0000
+0
 
 
 
 
 
 
-0000
-
-
-
-
-0000
 
 
 
 
 
-0000
 
 
 
-000
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+
+
+
+0
+
+
+
+0
+0
+0
+00000000
+0
+
+0
+0
+00000000
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+0
+
+
+0
+
+0
+0
+
+0
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+0
+
+0
+
+
+0
+
+
+
+0
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+
+
+
+
+
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+0
+
+
+
+
+0
+
+0
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
