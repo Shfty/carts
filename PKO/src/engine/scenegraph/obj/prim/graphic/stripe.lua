@@ -14,13 +14,7 @@ function stripe:g_draw()
 	local pos = self:getpos()
 	local t = self.tp
 	if(not self.at) t += pos
-	line(
-		pos.x,
-		pos.y,
-		t.x,
-		t.y,
- 	self.c
- )
+	line(pos,t,self.c)
 	
 	graphic.g_draw(self)
 end
