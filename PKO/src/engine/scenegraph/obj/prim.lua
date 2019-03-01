@@ -3,8 +3,9 @@
 -------------------------------
 prim=obj:subclass({
 	name="primitive",
-	pos=vec2:new(),
-	org=vec2:new()
+	pos=vec2:new(),			--position
+	org=vec2:new(),			--origin
+	a=0															--angle
 })
 
 function prim:getpos()
