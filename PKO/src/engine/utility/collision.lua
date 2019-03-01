@@ -306,7 +306,7 @@ function col:c_isect_c(a,b)
 	if dl <= tr then
 		return resp:new(
 			dn,
-			tr-dl,
+			dl-tr,
 			bp + dn * b.r
 		)
 	end
