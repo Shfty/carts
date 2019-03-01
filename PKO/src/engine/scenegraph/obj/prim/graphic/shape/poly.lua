@@ -24,13 +24,7 @@ function poly:draw_stroke()
 			self.vs[i+1] or self.vs[1]
 		v2 += pos
 
-		line(
-			v1.x,
-			v1.y,
-			v2.x,
-			v2.y,
-			self.sc
-		)
+		line(v1,v2,self.sc)
 	end
 
 	for i=1,#self.vs do
@@ -40,12 +34,12 @@ function poly:draw_stroke()
 
 end
 
-function poly:contains(p,m)
-	m = m or 255
-
-	if(band(self.cm,m)==0) then
-		return false
+function poly:center()
+	local pc = vec2:new()
+	for v in all(self.vs) do
+		pc += v
 	end
-
-	return col:p_in_py(p,self)
+	pc /= #self.vs
+	pc += self:getpos()
+	return pc
 end

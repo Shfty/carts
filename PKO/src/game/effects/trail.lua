@@ -43,7 +43,7 @@ function trail:g_draw()
 
 		local fp=self.ds[i]
 		local tp=self.ds[i+1] or self:getpos()
-		line(fp.x,fp.y,tp.x,tp.y,c)
+		line(fp,tp,c)
 	end
 	
 	graphic.g_draw(self)
