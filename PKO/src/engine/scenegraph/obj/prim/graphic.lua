@@ -46,8 +46,9 @@ function graphic:g_postdraw()
 	end
 end
 
-function graphic:contains(p,m)
-	return false
+function graphic:col_mask(m)
+	m = m or 255
+	return band(self.cm,m) > 0
 end
 
 require("graphic/dot")
