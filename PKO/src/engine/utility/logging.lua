@@ -12,7 +12,13 @@ end
 
 _old_tostr = tostr
 function tostr(s)
-	if(type(s) == "string") return s
+	if(type(s) == "string") then
+		return s
+	end
+
+	if(type(s) == "number") then
+		return _old_tostr(s)
+	end
 	
 	if(s.__tostr) then
 		return s:__tostr()
@@ -44,7 +50,7 @@ log_count = 1
 log_limit = 16
 function log(s)
 	local str = log_count..">"
-	str = s..tostr(s)
+	str = str..tostr(s)
 	add(log_buf,str)
 	if(#log_buf>log_limit) then
 		del(log_buf,log_buf[1])
