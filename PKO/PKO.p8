@@ -5,18 +5,351 @@ __lua__
 --collection of engine
 --functionality
 -------------------------------
-
 --utility
 --collection of utility
 --functionality
 -------------------------------
 
+--enable color literals
+poke(0x5f34,1)
+
+_old_line = line
+line=nil
+function d_line(a,b,c)
+	return _old_line(
+		a.x,
+		a.y,
+		b.x,
+		b.y,
+		c)
+end
+
+_old_circ = circ
+circ=nil
+function s_circ(p,r,c)
+	return _old_circ(
+		p.x,
+		p.y,
+		r,
+		c)
+end
+
+_old_circfill = circfill
+circfill=nil
+function f_circ(p,r,c)
+	return _old_circfill(
+		p.x,
+		p.y,
+		r,
+		c)
+end
+
+_old_rect = rect
+rect=nil
+function s_rect(a,b,c)
+	return _old_rect(
+		a.x,
+		a.y,
+		b.x,
+		b.y,
+		c)
+end
+
+_old_rectfill = rectfill
+rectfill=nil
+function f_rect(a,b,c)
+	return _old_rectfill(
+		a.x,
+		a.y,
+		b.x,
+		b.y,
+		c)
+end
+
+_old_clip = clip
+clip=nil
+function setclip(r)
+	return _old_clip(
+		r.min.x,
+		r.min.y,
+		r.max.x,
+		r.max.y
+	)
+end
+
+_old_camera = camera
+camera=nil
+function setcam(p)
+	return _old_camera(p.x,p.y)
+end
+
+_old_pset = pset
+pset=nil
+function d_point(p,c)
+	return _old_pset(
+		p.x,
+		p.y,
+		c
+	)
+end
+
+--drawstate
+--wrapper for pico8
+--internal draw state
+-------------------------------
+drawstate={}
+
+function drawstate:campos()
+	return vec2:new(
+		peek4(0x5f26),
+		peek4(0x5f28)
+	)
+end
+
+function drawstate:getclip()
+	local x1 = peek(0x5f20)
+	local y1 = peek(0x5f21)
+	return rect:new(
+		x1,
+		y1,
+		peek(0x5f22)-x1,
+		peek(0x5f23)-y1
+	)
+end
+
+--sprites
+--wrapper for pico8 sprite
+--functionality
+-------------------------------
+_old_sget = sget
+function sget(pos)
+	return _old_sget(pos.x,pos.y)
+end
+
+_old_spr = spr
+function spr(s,p,sz)
+	return _old_spr(
+		s,
+		p.x,
+		p.y,
+		sz.x,
+		sz.y
+	)
+end
+
+--sprite pos > sprite index
+--@spos vec2 sprite pixel coords
+--@return number sprite index
+function spos2idx(spos)
+	local dp = spos/8
+	return stile2idx(
+		vec2:new(
+			flr(dp.x),
+			flr(dp.y)
+		)
+	)
+end
+
+--sprite tile > sprite index
+--@spos vec2 sprite tile coords
+--@return number sprite index
+function stile2idx(stile)
+	return (stile.y*16)+stile.x
+end
+
+--sprite index > sprite tile
+--@sidx vec2 map tile coords
+--@return number sprite tile coords
+function sidx2tile(sidx)
+	return vec2:new(
+		sidx%16, 
+		flr(sidx/16)
+	)
+end
+
+--sprite index > sprite pos
+--@sidx number sprite index
+--@return number sprite pixel coords
+function sidx2pos(sidx)
+	return sidx2tile(sidx)*8
+end
+
+--walks along a sprite
+--line by line in the specified
+--direction and returns the
+--first non-0 pixel's coords
+function trace_edge(s,xs,ys,f)
+	f = f or false
+
+	local xb,xe,yb,ye=0,7,0,7
+
+	if(xs<0) xb,xe=7,0
+	if(ys<0) yb,ye=7,0
+	
+	local sp = sidx2pos(s)
+
+	if(not f) then
+		for x=xb,xe,xs do
+			for y=yb,ye,ys do
+				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
+					return vec2:new(x,y)
+				end
+			end
+		end
+	else
+		for y=yb,ye,ys do
+			for x=xb,xe,xs do
+				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
+					return vec2:new(x,y)
+				end
+			end
+		end
+	end
+end
+
+--traces the edges of the
+--given sprite in clockwise
+--order to generate a
+--simplified collision mesh
+function convex_hull(s)
+	local vs = {}
+
+	local sp = sidx2pos(s)
+
+	add(vs,trace_edge(s,1,1,true)-4)
+	add(vs,trace_edge(s,-1,1,true)-4)
+	add(vs,trace_edge(s,-1,1)-4)
+	add(vs,trace_edge(s,-1,-1)-4)
+	add(vs,trace_edge(s,-1,-1,true)-4)
+	add(vs,trace_edge(s,1,-1,true)-4)
+	add(vs,trace_edge(s,1,-1)-4)
+	add(vs,trace_edge(s,1,1)-4)
+
+	for i=#vs,1,-1 do
+		if(not vs[i]) del(vs,vs[i])
+	end
+
+	for i=#vs,1,-1 do
+		local v1 = vs[i]
+		local v2 = vs[i-1] or vs[#vs]
+		if(v1 == v2) then
+			del(vs,v1)
+		end
+	end
+
+	return vs
+end
+
+--map
+--wrapper for pico8 map
+--functionality
+-------------------------------
+--map pos > map tile
+--@pos vec2 map pixel coords
+--@return vec2 map tile coords
+function mpos2tile(pos)
+	return pos/8
+end
+
+--map tile > map pos
+--@mtile vec2 map tile coords
+--@return vec2 map pixel coords
+function mtile2pos(mtile)
+	return mtile*8
+end
+
+_old_mget = mget
+function mget(p)
+	return _old_mget(p.x, p.y)
+end
+
+_old_mset = mset
+function mset(p,c)
+	return _old_mset(p.x, p.y,c)
+end
+
+--logging
+--log functionality and
+--wrappers for built-in
+--string and print handling
+-------------------------------
+function getcursor()
+	cr = vec2:new()
+	cr.x = peek(0x5f26)
+	cr.y = peek(0x5f27)
+	return cr
+end
+
+_old_tostr = tostr
+function tostr(s)
+	if(not s) return "nil"
+	if(type(s) == "string") return s
+	if(type(s) == "number") return _old_tostr(s)
+	if(type(s) == "boolean") return _old_tostr(s)
+	
+	if(s.__tostr) then
+		return s:__tostr()
+	else
+		return _old_tostr(s)
+	end
+end
+
+_old_print = print
+function print(s,p,c)
+	s = tostr(s)
+	c = c or 7
+
+	if(not p) return _old_print(s)
+
+	return _old_print(
+		s.."\n",
+		p.x,
+		p.y,
+		c
+	)
+end
+
+log_buf = {}
+log_count = 1
+log_limit = 16
+function log(s)
+	local str = log_count..">"
+	str = str..tostr(s)
+	add(log_buf,str)
+	if(#log_buf>log_limit) then
+		del(log_buf,log_buf[1])
+	end
+	log_count += 1
+end
+
+time={
+	dt=0
+}
+
+function time:init()
+	self.dt=1/self:fpstarget()
+end
+
+function time:cpu_t()
+	return stat(1)
+end
+
+function time:syscpu_t()
+	return stat(2)
+end
+
+function time:fps()
+	return stat(7)
+end
+
+function time:fpstarget()
+	return stat(8)
+end
+
+
 --math
 --utility math functions
 -------------------------------
-pi=3.14159
-tau=2*pi
-
 function lerp(a,b,d)
 	return a+d*(b-a)
 end
@@ -25,6 +358,7 @@ _old_atan2 = atan2
 function atan2(v)
 	return _old_atan2(v.y,v.x)
 end
+
 --vec2
 --two dimensional vector
 -------------------------------
@@ -225,18 +559,105 @@ function vec2.__concat(lhs,rhs)
 	end
 end
 
---enable color literals
-poke(0x5f34,1)
+--rect
+--rectangle
+-------------------------------
+rect={
+	min=vec2:new(),
+	max=vec2:new()
+}
 
-_old_line = line
-function line(a,b,c)
-	return _old_line(
-		a.x,
-		a.y,
-		b.x,
-		b.y,
-		c)
+function rect:new(x1,y1,x2,y2)
+	x1 = x1 or 0
+	y1 = y1 or 0
+	x2 = x2 or 1
+	y2 = y2 or 1
+	
+	self.__index=self
+	return setmetatable({
+		min=vec2:new(x1,y1),
+		max=vec2:new(x2,y2)
+	}, self)
 end
+
+function rect:is_a(t)
+	return t == rect
+end
+
+function rect:__tostr()
+	return "min:"..self.min..
+	",max:"..self.max
+end
+
+function rect.__concat(lhs,rhs)
+	if(type(lhs)=="table") then
+		return lhs:__tostr()..rhs
+	end
+
+	if(type(rhs)=="table") then
+		return lhs..rhs:__tostr()
+	end
+end
+
+geo={
+	name="geo",
+	vs=nil,				--vertices
+	be=nil,				--box extents
+	cr=nil					--circle radius
+}
+
+function geo:new(v)
+	self.__index=self
+
+	local o = setmetatable({}, self)
+
+	if(type(v) == "table") then
+		if(v.is_a and v:is_a(vec2)) then
+			o.be = v
+			o:calculate_circle()
+		else
+			o.vs=v
+			o:calculate_box()
+			o:calculate_circle()
+		end
+	else
+		o.cr = v
+	end
+
+	return o
+end
+
+	function geo:calculate_box()
+	local bmin = nil
+	local bmax = nil
+
+	for v in all(self.vs) do
+		if(bmin == nil) then
+			bmin = vec2:new(v.x,v.y)
+		else
+			if(bmin.x > v.x) bmin.x = v.x
+			if(bmin.y > v.y) bmin.x = v.x
+		end
+		if(bmax == nil) then
+			bmax = vec2:new(v.x,v.y)
+		else
+			if(bmax.x < v.x) bmax.x = v.x
+			if(bmax.y < v.y) bmax.y = v.y
+		end
+	end
+
+	self.be=vec2:new(
+		(bmax.x-bmin.x)/2,
+		(bmax.y-bmin.y)/2
+	)
+end
+
+function geo:calculate_circle()
+	self.cr=self.be:len()
+end
+
+
+
 --input
 --collection of input wrappers
 -------------------------------
@@ -270,12 +691,12 @@ function controller:update()
 	local wx = 0
 	if(btn(0,self.p)) wx -= 1
 	if(btn(1,self.p)) wx += 1
-	self.dpad.x = wx
 
 	local wy = 0
 	if(btn(2,self.p)) wy -= 1
 	if(btn(3,self.p)) wy += 1
-	self.dpad.y = wy
+
+	self.dpad = vec2:new(wx,wy)
 
 	self._la = self.a
 	self.a=btn(4,self.p)
@@ -312,159 +733,10 @@ mouse = {
 }
 
 function mouse:update()
-	self.mp.x=stat(32)
-	self.mp.y=stat(33)
+	self.mp=vec2:new(stat(32),stat(33))
 	self.mb=stat(34)
 end
 
-
---sprites
---wrapper for pico8 sprite
---functionality
--------------------------------
-_old_sget = sget
-function sget(pos)
-	return _old_sget(pos.x,pos.y)
-end
-
---sprite pos > sprite index
---@spos vec2 sprite pixel coords
---@return number sprite index
-function spos2idx(spos)
-	local x=flr(spos.x/8)
-	local y=flr(spos.y/8)
-	return stile2idx(vec2:new(x,y))
-end
-
---sprite tile > sprite index
---@spos vec2 sprite tile coords
---@return number sprite index
-function stile2idx(stile)
-	return (stile.y*16)+stile.x
-end
-
---sprite index > sprite tile
---@sidx vec2 map tile coords
---@return number sprite tile coords
-function sidx2tile(sidx)
-	return vec2:new(
-		sidx%16, 
-		flr(sidx/16)
-	)
-end
-
---sprite index > sprite pos
---@sidx number sprite index
---@return number sprite pixel coords
-function sidx2pos(sidx)
-	return sidx2tile(sidx)*8
-end
-
---walks along a sprite
---line by line in the specified
---direction and returns the
---first non-0 pixel's coords
-function trace_edge(s,xs,ys,f)
-	f = f or false
-
-	local xb=0
-	local xe=7
-	local yb=0
-	local ye=7
-
-	if(xs<0) then
-		xb=7
-		xe=0
-	end
-
-	if(ys<0) then
-		yb=7
-		ye=0
-	end
-	
-	if(not f) then
-		local sp = sidx2pos(s)
-		for x=xb,xe,xs do
-			for y=yb,ye,ys do
-				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
-					return vec2:new(x,y)
-				end
-			end
-		end
-	else
-		local sp = sidx2pos(s)
-		for y=yb,ye,ys do
-			for x=xb,xe,xs do
-				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
-					return vec2:new(x,y)
-				end
-			end
-		end
-	end
-
-	return nil
-end
-
---traces the edges of the
---given sprite in clockwise
---order to generate a
---simplified collision mesh
-function convex_hull(s)
-	local vs = {}
-
-	local sp = sidx2pos(s)
-
-	add(vs,trace_edge(s,1,1,true))
-	add(vs,trace_edge(s,-1,1,true))
-	add(vs,trace_edge(s,-1,1))
-	add(vs,trace_edge(s,-1,-1))
-	add(vs,trace_edge(s,-1,-1,true))
-	add(vs,trace_edge(s,1,-1,true))
-	add(vs,trace_edge(s,1,-1))
-	add(vs,trace_edge(s,1,1))
-
-	for i=#vs,1,-1 do
-		if(not vs[i]) del(vs,vs[i])
-	end
-
-	for i=#vs,1,-1 do
-		local v1 = vs[i]
-		local v2 = vs[i-1] or vs[#vs]
-		if(v1 == v2) then
-			del(vs,v1)
-		end
-	end
-
-	return vs
-end
-
---map
---wrapper for pico8 map
---functionality
--------------------------------
---map pos > map tile
---@pos vec2 map pixel coords
---@return vec2 map tile coords
-function mpos2tile(pos)
-	return pos/8
-end
-
---map tile > map pos
---@mtile vec2 map tile coords
---@return vec2 map pixel coords
-function mtile2pos(mtile)
-	return mtile*8
-end
-
-_old_mget = mget
-function mget(p)
-	return _old_mget(p.x, p.y)
-end
-
-_old_mset = mset
-function mset(p,c)
-	return _old_mset(p.x, p.y,c)
-end
 
 --collision
 --wrapper for collision
@@ -492,7 +764,7 @@ end
 
 col={
 	sprite_geo={},
-	debug=false
+	debug=true
 }
 
 function col:init(numspr)
@@ -501,9 +773,28 @@ function col:init(numspr)
 	for i=0,numspr-1 do
 		if(fget(i)>0) then
 		 local vs = convex_hull(i)
-			self.sprite_geo[i] = vs
+			self.sprite_geo[i] =
+				geo:new(vs)
 
 			if(self.debug) then
+				circle:new(l_pl,{
+					pos=vec2:new(
+						(i%16)*10,
+						flr(i/16)*10
+					),
+					r=self.sprite_geo[i].cr,
+					sc=9,
+					f=false
+				})
+				box:new(l_pl,{
+					pos=vec2:new(
+						(i%16)*10,
+						flr(i/16)*10
+					),
+					sz=self.sprite_geo[i].be*2,
+					sc=11,
+					f=false
+				})
 				poly:fromsprite(l_pl,i,{
 					pos=vec2:new(
 						(i%16)*10,
@@ -516,216 +807,99 @@ function col:init(numspr)
 end
 
 --unified collision test
-function col:isect(a,b,_r)
+function col:isect(ap,ag,bp,bg)
 	r = r or false
 
-	--dot and vec2 are
-	--interchangeable
-	if(a:is_a(dot)) then
-		a=a:getpos()
+	--use circle-circle to early out
+	local cc = self:c_isect_c(ap,ag.cr,bp,bg.cr)
+	if(not cc) return nil
+
+	--if neither geo has a box,
+	--return the circle-circle result
+	if(not ag.be and not bg.be) return cc
+
+	--if both geos have a box
+	--test box-box
+	local bb = nil
+	if(ag.be and bg.be) then
+		bb = self:b_isect_b(ap,ag.be,bp,bg.be)
+		if (not bb) return nil
 	end
 
-	--point > circle
-	if(a:is_a(vec2) and
-				b:is_a(circle)) then
-		return self:p_in_c(a,b)
-	end
-
-	--point > box
-	if(a:is_a(vec2) and
-				b:is_a(box)) then
-		return self:p_in_b(a,b)
-	end
-
-	--point > polygon
-	if(a:is_a(vec2) and
-				b:is_a(poly)) then
-		return self:p_in_py(a,b)
-	end
-
-	--point > sprite
-	if(a:is_a(vec2) and
-				b:is_a(sprite)) then
-		return self:p_in_s(a,b)
-	end
-
-	--circle > circle
-	if(a:is_a(circle) and
-				b:is_a(circle)) then
-		return self:c_isect_c(a,b)
-	end
-
-	--circle > box
-	if(a:is_a(circle) and
-				b:is_a(box)) then
-		return self:c_isect_b(a,b)
-	end
-
-	--circle > poly
-	if(a:is_a(circle) and
-				b:is_a(poly)) then
-		return self:c_isect_py(a,b)
-	end
-
-	--box > box
-	if(a:is_a(box) and
-				b:is_a(box)) then
-		return self:b_isect_b(a,b)
-	end
-
-	--box > poly
-	if(a:is_a(box) and
-				b:is_a(poly)) then
-		return self:b_isect_py(a,b)
-	end
-
-	--poly > poly
-	if(a:is_a(poly) and
-				b:is_a(poly)) then
-		return self:py_isect_py(a,b)
-	end
-
-	--try reversing arguments
-	if not _r then
-		local rev = self:isect(b,a,true)
-		if(rev) then
-			rev.n = -rev.n
-			rev.pd = -rev.pd
-			log(rev.n)
-			rev.cp += rev.n * rev.pd
-		end
-		return rev
+	-- one geo has a box,
+	-- test circle-box
+	local bc = nil
+	if(not ag.be and bg.be) then
+		bc = self:c_isect_b(ap,ag.cr,bp,bg.be)
 	else
-		log("unsupported collision")
+		bc = self:c_isect_b(bp,bg.cr,ap,ag.be)
+		if (bc) bc.n = -bc.n
 	end
+	if (not bc) return nil
+
+	--if neither geo has a poly,
+	--return the box/circle result
+	if(not ag.vs and not bg.vs) return bb or bc
+
+	--if both geos have a poly,
+	--test poly-poly
+	local pp = nil
+	if(ag.vs and bg.vs) then
+		pp = self:py_isect_py(ap,ag.vs,bp,bg.vs)
+		if (not pp) return nil
+	end
+
+	-- one geo has a poly
+	local pr = nil
+	if(not ag.vs and bg.vs) then
+		if(ag.be) then
+			pr = self:b_isect_py(ap,ag.be,bp,bg.vs)
+		else
+			pr = self:c_isect_py(ap,ag.cr,bp,bg.vs)
+		end
+	else
+		if(bg.be) then
+			pr = self:b_isect_py(bp,bg.be,ap,ag.vs)
+		else
+			assert(ag.vs != nil)
+			pr = self:c_isect_py(bp,bg.cr,ap,ag.vs)
+		end
+
+		if(pr) pr.n = -pr.n
+	end
+
+	return pr
 end
 
 --point in circle
-function col:p_in_c(p,c)
-	local cp = c:getpos()
-	local cr = c.r
-
-	local d = cp - p
-	local dn = d:normalize()
-	local dl = d:len()
-
-	if dl <= cr then
-		local pd = cr - dl
-		log(pd)
-		return resp:new(
-			dn,
-			pd,
-			cp + (-dn * cr)
-		)
-	end
+function col:p_in_c(p,cp,cr)
+	return (p - cp):len() <= cr
 end
 
 --point in box
-function col:p_in_b(p,b)
-	local bp = b:getpos()
-	local bs = b.sz
-	local bc = bp + (bs/2)
+function col:p_in_b(p,bp,be)
+	local bmin = bp - be
+	local bmax = bp + be
 
-	local x = true
-	x = x and p.x >= bp.x
-	x = x and p.x <= bp.x+bs.x
+	local x = p.x >= bmin.x and
+											p.x <= bmax.x
 
-	local y = true
-	y = y and p.y >= bp.y
-	y = y and p.y <= bp.y+bs.y
+	local y = p.y >= bmin.y and
+											p.y <= bmax.y
 
-	if x and y then
-		local d = p-bc
-
-		local n = vec2:new()
-		local pd = 0
-		local cp = 0
-
-		if(abs(d.x * (bs.y/bs.x)) > abs(d.y)) then
-			n.x = sgn(d.x)
-			pd=(bs.x*0.5) - abs(d.x)
-			cp = bc + vec2:new(sgn(d.x) * bs.x * 0.5,d.y)
-		else
-			n.y = sgn(d.y)
-			pd=(bs.y*0.5) - abs(d.y)
-			cp = bc + vec2:new(d.x,sgn(d.y) * bs.y * 0.5)
-		end
-
-		return resp:new(
-			n,
-			pd,
-			cp
-		)
-	end
-end
-
-function col:py_resp(p,py)
-	local pp = py:getpos()
-	local pc = py:center()
-	local li = 0
-
-	for i=1,#py.vs do
-		local v1 = py.vs[i]
-		v1 += pp
-
-		local v2 =
-			py.vs[i+1] or py.vs[1]
-		v2 += pp
-
-		local rp = p-pc
-		local rv1 = v1-pc
-		local rv2 = v2-pc
-
-		local pa = atan2(rp)
-		local v1a = atan2(rv1)
-		local v2a = atan2(rv2)
-
-		if v1a < v2a then
-			if pa >= v1a and pa <= v2a then
-				li = i
-				break
-			end
-		else
-			if pa >= v1a or pa <= v2a then
-				li = i
-				break
-			end
-		end
-	end
-	
-	local v1 = py.vs[li]
-	v1 += pp
-
-	local v2 =
-		py.vs[li+1] or py.vs[1]
-	v2 += pp
-
-	local d = v2-v1
-	local dn = d:normalize()
-	local rp = p-v1
-	local pp = dn:dot(rp)
-
-	local n = dn:perp_ccw()
-	local pd = n:dot(rp)
-
-	return resp:new(
-		n,
-		pd,
-		v1 + dn*pp
-	)
+	return x and y
 end
 
 --point in polygon
-function col:p_in_py(p,py)
-	local pp = py:getpos()
+function col:p_in_py(p,pp,pvs)
 	local c=true
 
-	for i=1,#py.vs do
-		local v1 = py.vs[i]
+	for i=1,#pvs do
+		local v1 = pvs[i]
 		v1 += pp
 
 		local v2 =
-			py.vs[i+1] or py.vs[1]
+		pvs[i+1] or pvs[1]
 		v2 += pp
 
 		local d = v2-v1
@@ -737,147 +911,228 @@ function col:p_in_py(p,py)
 		end
 	end
 
-	if(c) return self:py_resp(p,py)
+	return c
 end
 
 --point in sprite
 function col:p_in_s(p,s)
-	local pos = s:getpos()
-	local lpos = p-pos
+	local d = p-s:getpos()
+	local ms = s.sz*8
 
-	if(lpos.x < 0 or
-		lpos.y < 0) then
-		return nil
-	end
-
-	if(lpos.x > s.sz.x*8 or
-		lpos.y > s.sz.y*8) then
-		return nil
-	end
+	if(d.x < 0 or	d.y < 0) return nil
+	if(d.x > ms.x or	d.y > ms.y) return nil
 
 	--get spritesheet coords
 	local sp = sidx2pos(s.s)
 
-	if sget(sp+lpos) > 0 then
+	if sget(sp+d) > 0 then
 		return resp:new()
 	end
 end
 
 --circle intersect circle
-function col:c_isect_c(a,b)
-	local ap = a:getpos()
-	local bp = b:getpos()
-	local d = ap-bp
+function col:c_isect_c(ap,ar,bp,br)
+	local d = bp-ap
 	local dl = d:len()
 	local dn = d:normalize();
-	local tr = a.r + b.r
+	local tr = ar + br
 	if dl <= tr then
 		return resp:new(
-			dn,
+			-dn,
 			tr-dl,
-			bp + dn * b.r
+			bp - dn * br
 		)
 	end
 end
 
 --circle intersect box
-function col:c_isect_b(c,b)
-	local cp = c:getpos()
-	local bp = b:getpos()
+function col:c_isect_b(cp,cr,bp,be)
+	vs={
+		bp-be,
+		bp+vec2:new(be.x,-be.y),
+		bp+be,
+		bp+vec2:new(-be.x,be.y)
+	}
 
-	local p_resp = self:p_in_b(cp,b)
-	if(p_resp) return p_resp
+	local d = bp - cp
+	local dn = d:normalize()
 
-	local bx = box:new(nil, {
-		pos=bp - vec2:new(c.r,0),
-		sz=b.sz + vec2:new(c.r*2,0)
-	})
-
-	local bx_resp = self:p_in_b(cp,bx)
-	if(bx_resp) then
-		bx_resp.cp.x += c.r * sgn((bp-cp).x)
-		return bx_resp
+	local md = nil
+	for i=1,4 do
+		local v = vs[i]
+		local pv = dn:dot(v-cp)
+		if md == nil or pv < md then
+			md = pv
+		end
 	end
 
-	local by = box:new(nil, {
-		pos=bp - vec2:new(0,c.r),
-		sz=b.sz + vec2:new(0,c.r*2)
-	})
+	if(md < cr) then
+	local x = true
+		x = x and cp.x >= bp.x-be.x
+		x = x and cp.x <= bp.x+be.x
 
-	local by_resp = self:p_in_b(cp,by)
-	if(by_resp) then
-		by_resp.cp.y += c.r * sgn((bp-cp).y)
-		return by_resp
-	end
+		local y = true
+		y = y and cp.y >= bp.y-be.y
+		y = y and cp.y <= bp.y+be.y
 
-	local sx = vec2:new(b.sz.x,0)
-	local sy = vec2:new(0,b.sz.y)
+		local n = -dn
+		if(x and not y) n.x = 0
+		if(y and not x) n.y = 0
 
-	local tl_resp = self:p_in_c(bp,c)
-	if(tl_resp) then
-		tl_resp.cp=bp
-		return tl_resp
-	end
-
-	local tr_resp = self:p_in_c(bp+sx,c)
-	if(tr_resp) then
-		tr_resp.cp=bp+sx
-		return tr_resp
-	end
-
-	local bl_resp = self:p_in_c(bp+sy,c)
-	if(bl_resp) then
-		bl_resp.cp=bp+sy
-		return bl_resp
-	end
-
-	local br_resp = self:p_in_c(bp+sx+sy,c)
-	if(br_resp) then
-		br_resp.cp=bp+sx+sy
-		return br_resp
+		return resp:new(
+			n,
+			cr - md,
+			cp + (dn * md)
+		)
 	end
 end
 
 --circle intersect poly
-function col:c_isect_py(c,py)
-	ppy_resp = self:p_in_py(c:getpos(),py)
-	if(ppy_resp) return ppy_resp
+function col:c_isect_py(cp,cr,pp,pvs)
+	local d = pp - cp
+	local dn = d:normalize()
 
-	local cp = c:getpos()
-	local vs = py.vs
-	for i=1,#vs do
-		local ap = vs[i]
-		ap += py:getpos()
-		local bp = vs[i+1] or vs[1]
-		bp += py:getpos()
-
-		local ab = ap - bp
-		local ac = ap - cp
-		local n = ab:perp_ccw():normalize()
-		if(vec2.dot(ac,n) > c.r) return nil
+	local pmin = nil
+	for v in all(pvs) do
+		local pv = dn:dot(pp+v-cp)
+		if pmin == nil or pv < pmin then
+			pmin=pv
+		end
 	end
 
-	local pp = py:getpos()
-	local pc = py:center()
+	if(pmin <= cr) then
+		ic = cp+dn*pmin
+		return resp:new(
+			-dn,
+			cr-pmin,
+			cp + (dn*pmin)
+		)
+	end
+end
+
+--box intersect box
+function col:b_isect_b(ap,ae,bp,be)
+	local a1 = ap - ae
+	local a2 = ap + ae
+	local b1 = bp - be
+	local b2 = bp + be
+
+	local isect = a1.x <= b2.x and
+															a2.x >= b1.x and
+															a1.y <= b2.y and
+															a2.y >= b1.y
+
+	if isect then
+		local mib = vec2:new(max(a1.x,b1.x),max(a1.y,b1.y))
+		local mab = vec2:new(min(a2.x,b2.x),min(a2.y,b2.y))
+		local ic = (mib+mab)/2
+		local ms = mab-mib
+
+		local d = ic-bp
+
+		local n = vec2:new()
+		local pd = 0
+		local cp = 0
+
+		if(abs(d.x * (be.y/be.x)) >= abs(d.y)) then
+			n.x = sgn(d.x)
+			pd=ms.x
+			cp = bp + vec2:new(n.x * be.x,d.y)
+		else
+			n.y = sgn(d.y)
+			pd=ms.y
+			cp = bp + vec2:new(d.x,n.y * be.y)
+		end
+
+		return resp:new(
+			n,
+			pd,
+			cp
+		)
+	end
+end
+
+--box intersect poly
+function col:b_isect_py(bp,be,pp,pvs)
+	bvs={
+		bp-be,
+		bp+vec2:new(be.x,-be.y),
+		bp+be,
+		bp+vec2:new(-be.x,be.y)
+	}
+
+	local d = pp - bp
+	local dn = d:normalize()
+
+	local bmax = nil
+	for i=1,4 do
+		local v = bvs[i]
+		local pv = dn:dot(v-bp)
+		if bmax == nil or pv > bmax then
+			bmax = pv
+		end
+	end
+
+	local pmin = nil
+	for v in all(pvs) do
+		local pv = dn:dot(pp+v-bp)
+		if pmin == nil or pv < pmin then
+			pmin=pv
+		end
+	end
+
+	log(dn*pmin)
+
+	if(pmin <= bmax) then
+		ic = bp+dn*bmax
+		return self:py_resp(ic,pp,pvs)
+	end
+end
+
+--poly intersect poly
+function col:py_isect_py(ap,avs,bp,bvs)
+	local d = bp - ap
+	local dn = d:normalize()
+
+	local amax = nil
+	for v in all(avs) do
+		local apr = dn:dot(v)
+		if amax==nil or amax < apr then
+			amax = apr
+		end
+	end
+
+	local bmin = nil
+	for v in all(bvs) do
+		local bpr = dn:dot(bp+v-ap)
+		if bmin==nil or bmin > bpr then
+			bmin = bpr
+		end
+	end
+
+	if(amax >= bmin) then
+		local ic = ap + (dn*amax)
+		return self:py_resp(ic,bp,bvs)
+	end
+end
+
+function col:py_resp(p,pp,pvs)
 	local li = 0
 
-	for i=1,#py.vs do
-		local v1 = py.vs[i]
-		v1 += pp
-
-		local v2 =
-			py.vs[i+1] or py.vs[1]
+	for i=1,#pvs do
+		local v1 = pvs[i] + pp
+		local v2 =	pvs[i+1] or pvs[1]
 		v2 += pp
 
-		local rp = cp-pc
-		local rv1 = v1-pc
-		local rv2 = v2-pc
+		local rp = p-pp
+		local rv1 = v1-pp
+		local rv2 = v2-pp
 
 		local pa = atan2(rp)
 		local v1a = atan2(rv1)
 		local v2a = atan2(rv2)
 
-		if v1a < v2a then
+		if(v1a < v2a and pa >= v1a and pa <= v2a) then
 			if pa >= v1a and pa <= v2a then
 				li = i
 				break
@@ -890,283 +1145,25 @@ function col:c_isect_py(c,py)
 		end
 	end
 	
-	local v1 = py.vs[li]
-	v1 += pp
-
-	local v2 =
-		py.vs[li+1] or py.vs[1]
+	local v1 = pvs[li] + pp
+	local v2 =	pvs[li+1] or pvs[1]
 	v2 += pp
 
 	local d = v2-v1
 	local dn = d:normalize()
-	local rp = cp-v1
-	local pp = dn:dot(rp)
+	local rp = p-v1
+	local pr = dn:dot(rp)
 
 	local n = dn:perp_ccw()
-	local pd = -n:dot(cp-v1)
-
-	local con = v1 +
-		dn*min(max(pp,0),d:len())
-
-		local pd = c.r-(cp-con):len()
-		log(pd)
+	local pd = -n:dot(rp)
 
 	return resp:new(
-		(cp-con):normalize(),
-		-pd,
-		con
+		n,
+		pd,
+		v1 + (dn*pr)
 	)
 end
 
---box intersect box
-function col:b_isect_b(a,b)
-	local a1 = a:getpos()
-	local b1 = b:getpos()
-	local a2 = a1 + a.sz
-	local b2 = b1 + b.sz
-
-	local isect = a1.x <= b2.x and
-															a2.x >= b1.x and
-															a1.y <= b2.y and
-															a2.y >= b1.y
-
-	if isect then
-		local mib = vec2:new(min(a1.x,b1.x),min(a1.y,b1.y))
-		local mab = vec2:new(max(a2.x,b2.x),max(a2.y,b2.y))
-		local ic = (mib+mab)/2
-		local bs = b.sz
-		local bc = b1 + (bs/2)
-
-		local d = ic-bc
-
-		local n = vec2:new()
-		local pd = 0
-		local cp = 0
-
-		if(abs(d.x * (bs.y/bs.x)) >= abs(d.y)) then
-			n.x = bs.x*0.5*sgn(d.x)
-			pd=abs(d.x) - (bs.x*0.5)
-			cp = bc + vec2:new(sgn(d.x) * bs.x * 0.5,d.y)
-		else
-			n.y = bs.y*0.5*sgn(d.y)
-			pd=abs(d.y) - (bs.y*0.5)
-			cp = bc + vec2:new(d.x,sgn(d.y) * bs.y * 0.5)
-		end
-
-		return resp:new(
-			n,
-			pd,
-			cp
-		)
-	end
-end
-
---box intersect poly
-function col:b_isect_py(b,py)
-	local bp = b:getpos()
-	local bs = b.sz
-	local bc = bp + (bs/2)
-	
-	local pp = py:getpos()
-	local pc = py:center()
-
-	local d = pc - bc
-	local dn = d:normalize()
-
-	local bmax = nil
-	local p = dn:dot(bp-bc)
-	if bmax==nil or bmax < p then
-		bmax=p
-	end
-	p = dn:dot(bp + vec2:new(bs.x,0)-bc)
-	if bmax==nil or bmax < p then
-		bmax=p
-	end
-	p = dn:dot(bp + bs-bc)
-	if bmax==nil or bmax < p then
-		bmax=p
-	end
-	p = dn:dot(bp + vec2:new(0,bs.y)-bc)
-	if bmax==nil or bmax < p then
-		bmax=p
-	end
-
-	pmin = nil
-	for v in all(py.vs) do
-		local c = dn:dot(v + pp - bc)
-		if pmin==nil or pmin > c then
-			pmin=c
-		end
-	end
-
-	if(bmax > pmin) then
-		ic = bc+(dn * ((bmax+pmin)/2))
-		return self:py_resp(ic,py)
-	end
-end
-
---poly intersect poly
-function col:py_isect_py(a,b)
-	local ap = a:getpos()
-	local ac = vec2:new()
-	for v in all(a.vs) do
-		ac += v
-	end
-	ac /= #a.vs
-	ac += ap
-
-	local bp = b:getpos()
-	local bc = vec2:new()
-	for v in all(b.vs) do
-		bc += v
-	end
-	bc /= #b.vs
-	bc += bp
-
-	local d = bc - ac
-	local dn = d:normalize()
-
-	local amax = nil
-	for v in all(a.vs) do
-		local apr = dn:dot(v+ap-ac)
-		if amax==nil or amax < apr then
-			amax = apr
-		end
-	end
-
-	local bmin = nil
-	for v in all(b.vs) do
-		local bpr = dn:dot(v+bp-ac)
-		if bmin==nil or bmin > bpr then
-			bmin = bpr
-		end
-	end
-
-	if(amax > bmin) then
-		local ic = ac + (dn*amax)
-		return self:py_resp(ic,b)
-	end
-end
-
---poly intersect sprite
-function col:py_isect_s(py,s)
-	local sz = s.sz * 8
-	for x=0,sz.x do
-		for y=0,sz.y do
-			local pos = vec2:new(x,y)
-			pos += s:getpos()
-			if(self:p_in_py(pos, py)) then
-				return resp:new()
-			end
-		end
-	end
-end
-
---drawstate
---wrapper for pico8
---internal draw state
--------------------------------
-drawstate={}
-
-function drawstate:campos()
-	return vec2:new(
-		peek4(0x5f26),
-		peek4(0x5f28)
-	)
-end
-
-function drawstate:getclip()
-	local x1 = peek(0x5f20)
-	local y1 = peek(0x5f21)
-	local x2 = peek(0x5f22)
-	local y2 = peek(0x5f23)
-	return {
-		x1,y1,
-		x2-x1,y2-y1
-	}
-end
-
-time={
-	dt=0
-}
-
-function time:init()
-	self.dt=1/self:getfpstarget()
-end
-
-function time:getfps()
-	return stat(7)
-end
-
-function time:getfpstarget()
-	return stat(8)
-end
-
---logging
---log functionality and
---wrappers for built-in
---string and print handling
--------------------------------
-function getcursor()
-	cr = vec2:new()
-	cr.x = peek(0x5f26)
-	cr.y = peek(0x5f27)
-	return cr
-end
-
-_old_tostr = tostr
-function tostr(s)
-	if(type(s) == "string") then
-		return s
-	end
-
-	if(type(s) == "number") then
-		return _old_tostr(s)
-	end
-	
-	if(s.__tostr) then
-		return s:__tostr()
-	else
-		return _old_tostr(s)
-	end
-end
-
-_old_print = print
-function print(s,x,y,c)
-	s = tostr(s)
-	c = c or 7
-
-	if(x and not y) then
-		local cr = getcursor()
-		cursor(cr.x,cr.y+1)
-		return
-	end
-
-	if(not x and not y) then
-		return _old_print(s)
-	end
-
-	return _old_print(s.."\n",x,y,c)
-end
-
-log_buf = {}
-log_count = 1
-log_limit = 16
-function log(s)
-	local str = log_count..">"
-	str = str..tostr(s)
-	add(log_buf,str)
-	if(#log_buf>log_limit) then
-		del(log_buf,log_buf[1])
-	end
-	log_count = log_count + 1
-end
-
-
---scenegraph
---collection of scene graph
---functionality
--------------------------------
 
 --object
 --basic scene graph unit
@@ -1289,20 +1286,66 @@ end
 --primitive
 --object with transform
 -------------------------------
+clear=obj:subclass({
+	name="clear",
+	c=0	--color
+})
+
+function clear:draw()
+	cls(self.c)
+	obj.draw(self)
+end
+
+function clear:__tostr()
+	return obj.__tostr(self).." - c:"..self.c
+end
+
+--primitive
+--object with transform
+-------------------------------
+clip=obj:subclass({
+	name="clip",
+	r=rect:new()
+})
+
+function clip:draw()
+	local cclip=drawstate:getclip()
+	setclip(self.r)
+	obj.draw(self)
+	setclip(cclip)
+end
+
+function clip:__tostr()
+	return obj.__tostr(self).." - r:"..self.r
+end
+
+--primitive
+--object with transform
+-------------------------------
 prim=obj:subclass({
 	name="primitive",
 	pos=vec2:new(),			--position
+	apos=false,
 	org=vec2:new(),			--origin
-	a=0															--angle
+	a=0														--angle
 })
 
 function prim:getpos()
 	local pos=vec2:new()
 	local c=self
-	while(c!=nil) do
-		if(c.pos) pos+=c.pos
-		if(c.org) pos+=c.org
-		c=c.parent
+	while c!=nil do
+		local cp = c.pos
+		local cap = c.apos
+		local co = c.org
+
+		if(cp) pos+=cp
+		if(co) pos+=co
+
+		if(cap) then
+			break
+		else
+			c=c.parent
+		end
 	end
 
 	return pos
@@ -1327,39 +1370,18 @@ graphic=prim:subclass({
 
 function graphic:draw()
 	if(not self.v) return
+
+	local cp = drawstate:campos()
+	local pos = self:getpos()
+	local d = pos - cp
+	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
 	
-	self:g_predraw()
 	self:g_draw()
-	self:g_postdraw()
 	
  prim.draw(self)
 end
 
-function graphic:g_predraw()
-	if(self.clip) then
-		self._cclip=drawstate:getclip()
-		clip(
-			self.clip[1],
-			self.clip[2],
-			self.clip[3],
-			self.clip[4]
-		)
-	end
-end
-
 function graphic:g_draw()
-end
-
-function graphic:g_postdraw()
-	if(self._cclip) then
-		clip(
-			self._cclip[1],
-			self._cclip[2],
-			self._cclip[3],
-			self._cclip[4]
-		)
-		self._cclip=nil
-	end
 end
 
 function graphic:col_mask(m)
@@ -1379,10 +1401,8 @@ dot=graphic:subclass({
 function dot:g_draw()
 	if(not self.v) return
 	
-	local pos = self:getpos()
-	pset(
-		pos.x,
-		pos.y,
+	d_point(
+		self:getpos(),
  	self.c
  )
 	
@@ -1394,8 +1414,7 @@ end
 -------------------------------
 obj_map=graphic:subclass({
 	name="map",
-	org=vec2:new(),
-	mtile=vec2:new(0,0),
+	mtile=vec2:new(),
 	sz=vec2:new(16,16)
 })
 
@@ -1419,13 +1438,11 @@ end
 function obj_map:find_sprites(s)
 	local coords = {}
 
-	local sx = self.mtile.x
-	local ex = sx + self.sz.x
-	local sy = self.mtile.y
-	local ey = sy + self.sz.y
+	local ss = self.mtile
+	local se = ss + self.sz
 
-	for y=sy,ey-1 do
-		for x=sx,ex-1 do
+	for y=ss.y,se.y-1 do
+		for x=ss.x,se.x-1 do
 			local pos = vec2:new(x,y)
 			local ms = mget(pos)
 			if(ms == s) then
@@ -1445,12 +1462,14 @@ function obj_map:contains(p,m)
 	local lpos = p-pos
 
 	if(lpos.x < 0 or
-		lpos.y < 0) then
+				lpos.y < 0) then
 		return false
 	end
 
-	if(lpos.x > self.sz.x*8 or
-		lpos.y > self.sz.y*8) then
+	local ts = self.sz * 8
+
+	if(lpos.x > ts.x or
+				lpos.y > ts.y) then
 		return false
 	end
 
@@ -1480,7 +1499,9 @@ end
 -------------------------------
 shape=graphic:subclass({
 	name="shape",
+	s=true,
 	sc=6,
+	f=true,
 	fc=7,
 	cm=255
 })
@@ -1488,8 +1509,8 @@ shape=graphic:subclass({
 function shape:g_draw()
 	if(not self.v) return
 	
-	if(self.fc) self:draw_fill()
-	if(self.sc) self:draw_stroke()
+	if(self.f) self:draw_fill()
+	if(self.s) self:draw_stroke()
 	
 	graphic.g_draw(self)
 end
@@ -1505,29 +1526,23 @@ end
 -------------------------------
 box=shape:subclass({
 	name="box",
-	sz=vec2:new(8,8)  --size
+	sz=vec2:new(4,4)  --size
 })
 
 function box:draw_fill()
-	local pos=self:getpos()
-	pos -= self.org
-	rectfill(
-		pos.x,
-		pos.y,
-		pos.x+self.sz.x,
-		pos.y+self.sz.y,
+	local pos=self:getpos()-self.org
+	f_rect(
+		pos-self.sz,
+		pos+self.sz,
  	self.fc
  )
 end
 
 function box:draw_stroke()
-	local pos=self:getpos()
-	pos -= self.org
-	rect(
-		pos.x,
-		pos.y,
-		pos.x+self.sz.x,
-		pos.y+self.sz.y,
+	local pos=self:getpos()-self.org
+	s_rect(
+		pos-self.sz,
+		pos+self.sz,
  	self.sc
  )
 end
@@ -1542,9 +1557,8 @@ circle=shape:subclass({
 
 function circle:draw_fill()
 	local pos=self:getpos()
-	circfill(
-		pos.x,
-		pos.y,
+	f_circ(
+		pos,
 		self.r,
  	self.fc
  )
@@ -1552,9 +1566,8 @@ end
 
 function circle:draw_stroke()
 	local pos=self:getpos()
-	circ(
-		pos.x,
-		pos.y,
+	s_circ(
+		pos,
 		self.r,
  	self.sc
  )
@@ -1570,40 +1583,27 @@ poly=shape:subclass({
 
 function poly:fromsprite(p,s,t)
 	t = t or {}
-	t.vs=col.sprite_geo[s]
+	t.geo=col.sprite_geo[s]
 	t.cm=fget(s)
-	return poly:new(p, t)
+	return poly:new(p,t)
 end
 
 function poly:draw_stroke()
 	local pos = self:getpos()
+	local vs = self.geo.vs
 
-	for i=1,#self.vs do
-		local v1 = self.vs[i]
-		v1 += pos
-
-		local v2 =
-			self.vs[i+1] or self.vs[1]
+	for i=1,#vs do
+		local v1 = vs[i] + pos
+		local v2 = vs[i+1] or vs[1]
 		v2 += pos
 
-		line(v1,v2,self.sc)
+		d_line(v1,v2,self.sc)
 	end
 
-	for i=1,#self.vs do
-		local v1 = self.vs[i] + pos
-		pset(v1.x,v1.y,8)
+	for i=1,#vs do
+		local v1 = vs[i] + pos
+		d_point(v1,8)
 	end
-
-end
-
-function poly:center()
-	local pc = vec2:new()
-	for v in all(self.vs) do
-		pc += v
-	end
-	pc /= #self.vs
-	pc += self:getpos()
-	return pc
 end
 
 
@@ -1620,13 +1620,10 @@ sprite=graphic:subclass({
 function sprite:g_draw()
 	if(not self.v) return
 	
-	local pos = self:getpos()
 	spr(
 		self.s,
-		pos.x,
-		pos.y,
-		self.sz.x,
-		self.sz.y
+		self:getpos(),
+		self.sz
 	)
 	
 	graphic.g_draw(self)
@@ -1635,20 +1632,20 @@ end
 --stripe
 --line graphic
 -------------------------------
-stripe=graphic:subclass({
+line=graphic:subclass({
 	name="stripe",
 	tp=vec2:new(8,0),	--target pos
 	at=true,										--abs target
 	c=7								       --color
 })
 
-function stripe:g_draw()
+function line:g_draw()
 	if(not self.v) return
 	
 	local pos = self:getpos()
 	local t = self.tp
 	if(not self.at) t += pos
-	line(pos,t,self.c)
+	d_line(pos,t,self.c)
 	
 	graphic.g_draw(self)
 end
@@ -1664,12 +1661,9 @@ text=graphic:subclass({
 function text:g_draw()
 	if(not self.v) return
 	
-	local pos=self:getpos()
-	
 	print(
 		self.str,
-		pos.x,
-		pos.y
+		self:getpos()
 	)
 	
 	graphic.g_draw(self)
@@ -1679,18 +1673,14 @@ end
 --cam
 --primitive to control camera
 -------------------------------
-cam=prim:subclass({
+camera=prim:subclass({
 	name="camera",
 	org=vec2:new(-64,-64)
 })
 
-function cam:update()
+function camera:update()
 	local pos = self:getpos()
-
-	camera(
-		pos.x,
-		pos.y
-	)
+	setcam(pos)
 	prim.update(self)
 end
 
@@ -1699,7 +1689,8 @@ end
 -------------------------------
 pointer=prim:subclass({
 	name="pointer",
-	org=vec2:new()
+	org=vec2:new(),
+	apos=true
 })
 
 function pointer:update()
@@ -1713,12 +1704,30 @@ end
 -------------------------------
 move=obj:subclass({
 	name="move",
-	dp=vec2:new()
+	dp=vec2:new(),
+	geo=nil
 })
 
 function move:update()
 	self.parent.pos += self.dp
 	self.dp=vec2:new()
+	
+	if(self.geo) then
+		cr = col:isect(
+			self.parent:getpos(),
+			self.geo,
+			pko_game.test:getpos(),
+			pko_game.test.geo
+		)
+
+		if cr then
+			self:collision(cr)
+		end
+	end
+end
+
+function move:collision(r)
+	self.parent.pos += r.n * r.pd
 end
 
 --proj_move
@@ -1731,9 +1740,11 @@ proj_move=obj:subclass({
 })
 
 function proj_move:update()
+	local a = self.a
+
 	self.dp = vec2:new(
-		cos(self.a),
-		sin(self.a)
+		cos(a),
+		sin(a)
 	) * self.s * time.dt
 	
 	move.update(self)
@@ -1752,41 +1763,47 @@ octo_move=move:subclass({
 })
 
 function octo_move:update()
-	if(self.wv.x==0 and self.vx!=0) then
-		local dv=min(
-			self.dc*time.dt,
-			abs(self.v.x)
-		)*sgn(self.v.x)
-		
-		self.v.x-=dv
-	end
-	
-	if(self.wv.y==0 and self.v.y!=0) then
-		local dv=min(
-			self.dc*time.dt,
-			abs(self.v.y)
-		)*sgn(self.v.y)
-		
-		self.v.y-=dv
-	end
-	
-	self.v.x += self.wv.x * self.ac * time.dt
-	self.v.y += self.wv.y * self.ac * time.dt
+	local v = self.v
+	local mv = self.mv
+	local dc = self.dc
+	local wv = self.wv
+	local dt = time.dt
 
-	if(abs(self.v.x) > self.mv) then
-		self.v.x=self.mv*sgn(self.v.x)
+	if(wv.x==0) then
+		local dv=min(
+			dc*dt,
+			abs(v.x)
+		)*sgn(v.x)
+		
+		v.x-=dv
 	end
 	
-	if(abs(self.v.y) > self.mv) then
-		self.v.y=self.mv*sgn(self.v.y)
+	if(wv.y==0) then
+		local dv=min(
+			dc*dt,
+			abs(v.y)
+		)*sgn(v.y)
+		
+		v.y-=dv
+	end
+	
+	v += wv * self.ac * dt
+
+	if(v:len() > mv) then
+		v = v:normalize() * mv
 	end
 
-	self.parent.pos.x += self.v.x * time.dt
-	self.parent.pos.y += self.v.y * time.dt
+	self.v = v
+	self.dp = v * dt
 	
 	move.update(self)
 end
 
+function octo_move:collision(r)
+	move.collision(self,r)
+	local pv = r.n:dot(self.v)
+	self.v -= r.n * pv
+end
 
 
 
@@ -1801,54 +1818,65 @@ dbg_ui=graphic:subclass({
 	pos=vec2:new(2,2),
 	tabs=nil,
 	at=nil,
-	tw=nil
+	tw=nil,
+	pw=nil,
+	wrap=nil
 })
 
 function dbg_ui:init()
 	graphic.init(self)
 	
-	local bg=box:new(self,{
+	local wrap=graphic:new(self,{
+		name="wrap"
+	})
+	self.wrap = wrap
+
+	self.pw=pointer:new(self)
+	
+	local bg=box:new(wrap,{
 		sz=vec2:new(123,8),
 		sc=0x1107.0000,
 		fc=0x1100.5a5a
 	})
 	
 	self.tw=text:new(bg,{
-		pos=vec2:new(2,2),
-		str="foo"
+		pos=vec2:new(2,2)
 	})
 	
-	self.tabs={}
-	self.tabs["1"]=
-		dbg_ovr:new(self)
-	self.tabs["2"]=
-		dbg_log:new(self)
-	self.tabs["3"]=
-		dbg_sg:new(self,{
-			root=root
-		})
+	local tabs = {}
+	tabs["1"]=
+		dbg_ovr:new(wrap)
+	tabs["2"]=
+		dbg_log:new(wrap)
+	tabs["3"]=
+		dbg_sg:new(wrap)
+	self.tabs=tabs
 end
 
 function dbg_ui:update()
 	graphic.update(self)
 	self.pos=drawstate:campos()+2
+
+	local tabs = self.tabs
+	local at = self.at
 	
-	for k,tab in pairs(self.tabs) do
+	for k,tab in pairs(tabs) do
  	if(kb:keyp(k)) then
- 		if(self.at!=k) then
-				self.at=k
+ 		if(at!=k) then
+				at=k
 				self.tw.str=tab.name
 			else
-				self.at=nil
+				at=nil
 			end
  	end
 	end
 	
-	for k,tab in pairs(self.tabs) do
-		tab.v=k==self.at
+	for k,tab in pairs(tabs) do
+		tab.v=k==at
 	end
 	
-	self.v = self.at != nil
+	self.at = at
+	self.wrap.v = at != nil
 end
 
 --debug panel
@@ -1873,26 +1901,37 @@ end
 
 function dbg_panel:update()
 	if(not self.v) return
+
+	local sy = self.sy
 	
-	if(kb:keyp("-")) self.sy -= 114
-	if(kb:keyp("=")) self.sy += 114
-	if(kb:keyp("[")) self.sy -= 6
-	if(kb:keyp("]")) self.sy += 6
+	if(kb:keyp("-")) sy -= 114
+	if(kb:keyp("=")) sy += 114
+	if(kb:keyp("[")) sy -= 6
+	if(kb:keyp("]")) sy += 6
 	
-	self.sy = max(self.sy,0)
+	self.sy = max(sy,0)
 	
 	graphic.update(self)
 end
 
 function dbg_panel:__tostr()
+	local w = self.w
+
 	return
 		prim.__tostr(self).." "..
-		"w:"..flr(self.w)..","..
-		"w:"..flr(self.w)
+		"w:"..flr(w)..","..
+		"w:"..flr(w)
 end
 
 --debug overlay
 -------------------------------
+ts_init_s = 0
+ts_init_e = 0
+ts_update_s = 0
+ts_update_e = 0
+ts_draw_s = 0
+ts_draw_e = 0
+
 dbg_ovr=dbg_panel:subclass({
 	name="system info",
 	key="1",
@@ -1920,18 +1959,23 @@ function dbg_ovr:update()
 	local mem=stat(0)
 	
 	--cpu
-	local tcpu = stat(1)*100
-	local scpu = stat(2)*100
-	local ucpu = tcpu-scpu
-	local fps = time:getfps()
-	local tfps = time:getfpstarget()
+	local icpu = ts_init_e-ts_init_s
+	
+	local ucpu = ts_update_e-ts_update_s
+	local dcpu = ts_draw_e-ts_draw_s
+	local tcpu = ucpu+dcpu
+
+	local fps = time:fps()
+	local tfps = time:fpstarget()
 	
 	str=str..
 		"    memory: "..mem.." kib\n"..
 		"\n"..
-		"system cpu: "..scpu.." %\n"..
-		"  user cpu: "..ucpu.." %\n"..
-		" total cpu: "..tcpu.." %\n"..
+		"   init cpu: "..(icpu*100).." %\n"..
+		"\n"..
+		" update cpu: "..(ucpu*100).." %\n"..
+		"   draw cpu: "..(dcpu*100).." %\n"..
+		"  total cpu: "..(tcpu*100).." %\n"..
 		"\n"..
 		"target fps: "..tfps.."\n"..
 		"       fps: "..fps.."\n"..
@@ -1946,15 +1990,20 @@ end
 dbg_log=dbg_panel:subclass({
 	name="log",
 	key="2",
+	cw=nil,
 	tw=nil
 })
 
 function dbg_log:init()
 	dbg_panel.init(self)
+
+	local cw=clip:new(self,{
+		r=rect:new(2,10,124,116)
+	})
+	self.cw = cw
 	
-	self.tw=text:new(self,{
-		pos=vec2:new(2,2),
-		clip={2,10,124,116}
+	self.tw=text:new(cw,{
+		pos=vec2:new(2,2)
 	})
 end
 
@@ -1968,25 +2017,29 @@ function dbg_log:update()
 		str = str..s.."\n"
 	end
 	
-	self.tw.pos.y=2-self.sy
-	self.tw.str=str
+	local tw = self.tw
+	tw.pos.y=2-self.sy
+	tw.str=str
 end
 
 --debug scenegraph
 -------------------------------
 dbg_sg=dbg_panel:subclass({
 	name="scenegraph",
-	root=nil,
 	key="3",
+	cw=nil,
 	tw=nil
 })
 
 function dbg_sg:init()
 	dbg_panel.init(self)
+
+	self.cw=clip:new(self,{
+		r=rect:new(2,10,124,116)
+	})
 	
-	self.tw=text:new(self,{
-		pos=vec2:new(2,2),
-		clip={2,10,124,116}
+	self.tw=text:new(self.cw,{
+		pos=vec2:new(2,2)
 	})
 end
 
@@ -1994,9 +2047,10 @@ function dbg_sg:update()
 	dbg_panel.update(self)
 	
 	if(not self.v) return
-	
-	self.tw.pos.y=2-self.sy
-	self.tw.str=root:print()
+
+	local tw = self.tw
+	tw.pos.y=2-self.sy
+	tw.str=engine.sg:print()
 end
 
 --debug coordinate axis
@@ -2013,13 +2067,13 @@ function dbg_axis:draw()
 
 	local o = (self.axis*self.sz):rotate(self.a)
 
-	line(
+	d_line(
 		pos,
 		pos + o,
 		12
 	)
 
-	line(
+	d_line(
 		pos,
 		pos + o:perp_ccw(),
 		8
@@ -2030,10 +2084,90 @@ end
 
 
 
+engine={
+	game=nil,
+	sg=obj:new(nil,{
+		name="root"
+	}),
+	dev_mode=true,
+	dev_ui=nil
+}
+
+--initialization
+-------------------------------
+function _init()
+	print "ko engine"
+	print "-------------------"
+
+	print "initializing..."
+	if not engine.game then
+		print "error: no game module loaded"
+		return
+	end
+	
+	if(engine.dev_mode) then
+		ts_init_b=time:cpu_t()
+		engine.dev_ui=dbg_ui:new(nil)
+	end
+
+	--initialize engine
+	time:init()
+	col:init()
+
+	--initialize game
+	engine.game:init()
+
+	if(engine.dev_mode) then
+		engine.sg:addchild(engine.dev_ui)
+		ts_init_e=time:cpu_t()
+	end
+end
+
+--main loop
+-------------------------------
+function _update60()
+	if(not engine.game) return
+
+	local dm = engine.dev_mode
+	if(dm) then
+		ts_update_s=time:cpu_t()
+	end
+
+	--update input
+	controller:update()
+	if(dm) then
+		kb:update()
+		mouse:update()
+	end
+
+	--update scenegraph
+	engine.sg:update()
+
+	if(dm) then
+		ts_update_e=time:cpu_t()
+	end
+end
+
+--render loop
+-------------------------------
+function _draw()
+	if(not engine.game) return
+
+	local dm = engine.dev_mode
+	if(dm) then
+		ts_draw_s=time:cpu_t()
+	end
+
+	engine.sg:draw()
+	
+	if(dm) then
+		ts_draw_e=time:cpu_t()
+	end
+end
+
 --game
 --collection of game
 --functionality
-
 --effects
 --collection of effects
 --functionality
@@ -2083,7 +2217,7 @@ function trail:g_draw()
 
 		local fp=self.ds[i]
 		local tp=self.ds[i+1] or self:getpos()
-		line(fp,tp,c)
+		d_line(fp,tp,c)
 	end
 	
 	graphic.g_draw(self)
@@ -2125,7 +2259,7 @@ function missile:update()
 
 	local pos = self:getpos()
 	local cm = self.cm
-	if(bg:contains(pos, cm)) then
+	if(pko_game.bg:contains(pos, cm)) then
 		self:destroy()
 	end
 end
@@ -2160,6 +2294,7 @@ end
 pko=prim:subclass({
 	name="pko",
 	pos=vec2:new(64,64),
+	geo=nil,
 	mc=nil,	--move component
 	sc=nil,	--sprite component
 	tc=nil,	--trail component
@@ -2168,12 +2303,19 @@ pko=prim:subclass({
 
 function pko:init()
 	prim.init(self)
-	self.mc=octo_move:new(self)
+
 	self.sc=sprite:new(self,{
 		s=1
 	})
+	self.geo = geo:new(col.sprite_geo[1].vs)
+	self.geo:calculate_circle()
+	self.geo.vs = nil
+	self.mc=octo_move:new(self,{
+		geo=self.geo
+	})
+
 	self.tc=trail:new(self)
-	self.cc=cam:new(self)
+	self.cc=camera:new(self)
 end
 
 function pko:update()
@@ -2188,7 +2330,7 @@ end
 
 function pko:burst(t,num)
 	for i=0,num-1 do
-		t:new(l_ms,{
+		t:new(pko_game.l_ms,{
 			pos=self.pos,
 			sa=i/num
 		})
@@ -2196,116 +2338,77 @@ function pko:burst(t,num)
 end
 
 
---config
--------------------------------
-debug_mode=true
-
---variables
--------------------------------
-root=nil
-
-bg=nil
-
-l_pl=nil
-l_tr=nil
-l_ms=nil
-
-d_ui=nil
-
-pnt=nil
-pnt_g=nil
-test=nil
-col_vis=nil
-
-player=nil
+pko_game={
+	root=nil,
+	
+	bg=nil,
+	
+	l_pl=nil,
+	l_tr=nil,
+	l_ms=nil,
+	
+	pnt_g=nil,
+	test=nil,
+	col_vis=nil
+}
 
 --initialization
 -------------------------------
-function _init()
-	--calculate dt
-	time:init()
+function pko_game:init()
+	--initial scene clear
+	clear:new(engine.sg)
 
-	--generate collision
-	col:init()
-
-	--setup scenegraph
-	root=obj:new(nil,{
-		name="root"
-	})
-
-	bg=obj_map:new(root,{
+	--background
+	self.bg=obj_map:new(engine.sg,{
 		name="background"
 	})
 	
-	l_pl=obj:new(root,{
+	--layers
+	self.l_pl=obj:new(engine.sg,{
 		name="layer: player"
 	})
 	
-	l_ms=obj:new(root,{
+	self.l_ms=obj:new(engine.sg,{
 		name="layer: missiles"
 	})
 	
-	l_ui=obj:new(root,{
+	self.l_ui=obj:new(engine.sg,{
 		name="layer: ui"
 	})
 
-	--debug ui
-	if(debug_mode) do
-		d_ui=dbg_ui:new(l_ui)
-		pnt=pointer:new(l_ui)
-		
-		pnt_g=box:new(pnt,{
-			sz=vec2:new(16,8)
-		})
-		
-		test=poly:fromsprite(l_ui,1,{
-			pos=vec2:new(32,32),
-			sz=vec2:new(16,8)
-		})
-		
-		col_vis=dbg_axis:new(l_ui)
-	end
-
 	--spawn player
-	local ps = bg:find_sprites(1)
+	local ps = self.bg:find_sprites(1)
 	for foo in all(ps) do
 		mset(foo, 0)
-		player=pko:new(l_pl,{
+		pko:new(self.l_pl,{
 			pos = (foo*8)+vec2:new(4,4)
 		})
 	end
-end
 
---main loop
--------------------------------
-function _update60()
-	controller:update()
-	if(debug_mode) then
-		kb:update()
-		mouse:update()
+	--debug ui
+	if(engine.dev_mode) then
+		self.pnt_g=dot:new(engine.dev_ui.pw)
+
+		self.test=circle:new(self.l_pl,{
+			pos=vec2:new(32,32),
+			r=8,
+			geo=geo:new(8)
+		})
+		--[[
+		self.test=box:new(self.l_pl,{
+			pos=vec2:new(32,32),
+			sz=vec2:new(8,8),
+			geo=geo:new(vec2:new(8,8))
+		})
+		self.test=poly:fromsprite(self.l_pl,1,{
+			pos=vec2:new(32,32)
+		})
+		]]
 	end
-
-	ci = col:isect(pnt_g, test)
-	if(ci) then
-		pnt_g.pos -= ci.n * ci.pd
-		col_vis.pos = ci.cp
-		col_vis.a = atan2(ci.n)
-	else
-		col_vis.pos = vec2:new(-8,-8)
-		col_vis.a = 0
-	end
-	
-	root:update()
-end
-
---render loop
--------------------------------
-function _draw()
-	cls()
-	root:draw()
 end
 
 
+engine.game=pko_game
 __gfx__
 0000000007800e8000000000000b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000e8c79182000ee00000bb3300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2363,6 +2466,27 @@ dddddddd555555555551111100000000000000000000000000000000000000000000000000000000
 00000ddd555555551110000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 000000dd555555551100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000d111111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+00000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+15151515151515151515151515151515000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
 0003020400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001010100000000000000000000000000010101000000000000000000000000000101010000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2383,1713 +2507,6 @@ __map__
 5203034051515151515151420300035000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5141415151515151515151514141415100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000
-0
-0000000000000000000
-0000000000000000000000
-0
-00000000
-0
-
-0
-0
-00000000
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-0
-0
-00000000
-0
-
-0
-0
-00000000
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-5151515151515151515151515151515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000
-0
-0000000000000000000
-0000000000000000000000
-0
-00000000
-0
-
-0
-0
-00000000
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-0
-0
-00000000
-0
-
-0
-0
-00000000
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-0
-
-0
-
-0
-
-0
-
-0
-
-0
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-0
-
-
-
-0
-0
-0
-00000000
-0
-
-0
-0
-00000000
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-0
-
-
-0
-
-0
-0
-
-0
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-0
-
-0
-
-
-0
-
-
-
-0
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-0
-
-0
-
-0
-
-0
-
-0
-
-0
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-0
-
-
-
-
-0
-
-0
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
