@@ -323,11 +323,13 @@ function log(s)
 end
 
 time={
-	dt=0
+	dt=nil
 }
 
-function time:init()
-	self.dt=1/self:fpstarget()
+function time:update()
+	if self.dt == nil then
+		self.dt=1/self:fpstarget()
+	end
 end
 
 function time:cpu_t()
@@ -2111,7 +2113,6 @@ function _init()
 	end
 
 	--initialize engine
-	time:init()
 	col:init()
 
 	--initialize game
@@ -2127,6 +2128,8 @@ end
 -------------------------------
 function _update60()
 	if(not engine.game) return
+	
+	time:update()
 
 	local dm = engine.dev_mode
 	if(dm) then
