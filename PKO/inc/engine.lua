@@ -33,7 +33,6 @@ function _init()
 	end
 
 	--initialize engine
-	time:init()
 	col:init()
 
 	--initialize game
@@ -49,6 +48,8 @@ end
 -------------------------------
 function _update60()
 	if(not engine.game) return
+	
+	time:update()
 
 	local dm = engine.dev_mode
 	if(dm) then

@@ -1,9 +1,11 @@
 time={
-	dt=0
+	dt=nil
 }
 
-function time:init()
-	self.dt=1/self:fpstarget()
+function time:update()
+	if self.dt == nil then
+		self.dt=1/self:fpstarget()
+	end
 end
 
 function time:cpu_t()
