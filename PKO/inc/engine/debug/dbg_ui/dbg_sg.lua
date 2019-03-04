@@ -26,5 +26,5 @@ function dbg_sg:update()
 
 	local tw = self.tw
 	tw.trs.t.y=-54-self.sy
-	tw.str=engine.sg:print()
+	tw.str=engine:get_active_scene().sg:print()
 end

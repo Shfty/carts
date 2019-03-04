@@ -270,11 +270,15 @@ function obj:draw()
 	end
 end
 
-function obj:destroy()
+function obj:detach()
 	if(self.parent) then
 		self.parent:remchild(self)
 		self.parent=nil
 	end
+end
+
+function obj:destroy()
+	self:detach()
 	
 	if(#self.children>0) then
  	while #self.children>0 do
@@ -566,6 +570,10 @@ function vec2:__le(rhs)
 
 	return self.x<=rhs and
 		self.y<=rhs
+end
+
+function vec2:copy()
+	return vec2:new(self.x,self.y)
 end
 
 function vec2:sqlen()
@@ -1030,12 +1038,40 @@ end
 --functionality
 -------------------------------
 engine={
-	game=nil,
-	sg=obj:new(nil,{
+	_sg=obj:new(nil,{
 		name="root"
 	}),
-	dev_ui=nil
+	_sg_wrap=nil,
+	_dev_ui=nil,
+	_scenes={},
+	_active_scene=nil
 }
+
+engine._sg_wrap = obj:new(
+	engine._sg,
+	{
+		name="scene wrapper"
+	}
+)
+
+function engine:set_active_scene(am)
+	for m in all(self._scenes) do
+		if(m.name == am) then
+			if self._active_scene != nil then
+				self._active_scene.sg:detach()
+			end
+			self._active_scene = m
+			if self._active_scene != nil then
+				self._sg_wrap:addchild(m.sg)
+			end
+			break
+		end
+	end
+end
+
+function engine:get_active_scene()
+	return self._active_scene
+end
 
 --initialization
 -------------------------------
@@ -1045,8 +1081,8 @@ function _init()
 	print "-------------------"
 
 	print "initializing..."
-	if not engine.game then
-		print "error: no game module loaded"
+	if not engine._active_scene then
+		print "error: no scene loaded"
 		return
 	end
 
@@ -1054,7 +1090,7 @@ function _init()
 	if(debug != nil) then
 		debug.ts_init_b=time:cpu_t()
 		print "debug ui..."
-		engine.dev_ui=dbg_ui:new(nil)
+		engine._dev_ui=dbg_ui:new(nil)
 	end
 
 	--enable color literals
@@ -1065,12 +1101,14 @@ function _init()
 	print "collision..."
 	col:init()
 
-	--initialize game
-	print "game..."
-	engine.game:init()
-
+	--initialize scenes
+	print "scenes..."
+	for m in all(engine._scenes) do
+		m:init()
+	end
+	
 	if(debug != nil) then
-		engine.sg:addchild(engine.dev_ui)
+		engine._sg:addchild(engine._dev_ui)
 		debug.ts_init_e=time:cpu_t()
 	end
 end
@@ -1078,7 +1116,7 @@ end
 --main loop
 -------------------------------
 function _update60()
-	if(not engine.game) return
+	if(not engine._active_scene) return
 	
 	time:update()
 
@@ -1095,7 +1133,7 @@ function _update60()
 	end
 
 	--update scenegraph
-	engine.sg:update()
+	engine._sg:update()
 
 	if(dm) then
 		debug.ts_update_e=time:cpu_t()
@@ -1105,14 +1143,15 @@ end
 --render loop
 -------------------------------
 function _draw()
-	if(not engine.game) return
+	if(not engine._active_scene) return
 
 	local dm = debug != nil
 	if(dm) then
 		debug.ts_draw_s=time:cpu_t()
 	end
 
-	engine.sg:draw()
+	-- draw scenegraph
+	engine._sg:draw()
 	
 	if(dm) then
 		debug.ts_draw_e=time:cpu_t()
@@ -1222,8 +1261,7 @@ function graphic:draw()
 	if(not self.v) return
 
 	local cp = drawstate:campos()
-	local pos = self:t().t
-	local d = pos - cp
+	local d = self:t().t - cp
 	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
 	
 	self:g_draw()
@@ -1532,6 +1570,7 @@ function rect.__concat(lhs,rhs)
 	end
 end
 
+
 --debug log
 -------------------------------
 dbg_log=dbg_panel:subclass({
@@ -1596,7 +1635,7 @@ function dbg_sg:update()
 
 	local tw = self.tw
 	tw.trs.t.y=-54-self.sy
-	tw.str=engine.sg:print()
+	tw.str=engine:get_active_scene().sg:print()
 end
 
 
@@ -1618,8 +1657,6 @@ function dbg_ui:init()
 		name="wrap"
 	})
 	self.wrap = wrap
-
-	self.pw=pointer:new(self)
 	
 	local bg=box:new(wrap,{
 		trs=trs:new(vec2:new(61,5)),
@@ -1640,6 +1677,8 @@ function dbg_ui:init()
 	tabs["3"]=
 		dbg_sg:new(wrap)
 	self.tabs=tabs
+
+	self.pw=pointer:new(self.wrap)
 end
 
 function dbg_ui:update()
@@ -1678,8 +1717,6 @@ dbg_axis=graphic:subclass({
 
 function dbg_axis:init()
 	graphic.init(self)
-	self.trs.a = true
-	self.trs.s = vec2:new(5,5)
 	self.axis = self.axis or
 													vec2:new(0,1)
 end
@@ -1688,7 +1725,7 @@ function dbg_axis:g_draw()
 	local trs = self:t()
 	local t = trs.t
 
-	local o = (self.axis*trs.s):rotate(trs.r)
+	local o = (self.axis*self.sz):rotate(trs.r)
 
 	d_line(
 		t,
@@ -1757,9 +1794,9 @@ function poly:init()
 end
 
 function poly:fromsprite(p,s,t)
-	print(#col.sprite_geo)
 	t = t or {}
 	t.geo=col.sprite_geo[s]
+	assert(t.geo)
 	t.cm=fget(s)
 	return poly:new(p,t)
 end
@@ -1770,27 +1807,33 @@ function poly:draw_stroke()
 	local vs = self.geo.vs
 
 	for i=1,#vs do
-		local v1 = vs[i]*s
-		local vp1 = v1 + p
-		local v2 = vs[i+1] or vs[1]
+		local v1 = vs[i]:copy()
+		local v2 = (vs[i+1] or vs[1]):copy()
+
+		if(v1.x > 0) v1.x -= 1
+		if(v1.y > 0) v1.y -= 1
+		if(v2.x > 0) v2.x -= 1
+		if(v2.y > 0) v2.y -= 1
+
+		v1 *= s
+		v1 += p
+
 		v2 *= s
-		local vp2 = v2 + p
+		v2 += p
 
-		if(v1.x > 0) vp1.x -= 1
-		if(v1.y > 0) vp1.y -= 1
-		if(v2.x > 0) vp2.x -= 1
-		if(v2.y > 0) vp2.y -= 1
-
-		d_line(vp1,vp2,self.sc)
+		d_line(v1,v2,self.sc)
 	end
 
 	for i=1,#vs do
-		local v1 = vs[i]*s
-		local vp1 = v1 + p
-		if(v1.x > 0) vp1.x -= 1
-		if(v1.y > 0) vp1.y -= 1
+		local v1 = vs[i]:copy()
 
-		d_point(vp1,8)
+		if(v1.x > 0) v1.x -= 1
+		if(v1.y > 0) v1.y -= 1
+
+		v1 *= s
+		v1 += p
+
+		d_point(v1,8)
 	end
 end
 
@@ -1835,6 +1878,26 @@ debug={
 	ts_draw_s = 0,
 	ts_draw_e = 0
 }
+scene={
+	name="scene",
+	sg=nil
+}
+
+function scene:new(t)
+	self.__index=self
+	local o = setmetatable(
+		t or {},
+		self
+	)
+	o.sg = obj:new(nil)
+	add(engine._scenes, o)
+	return o
+end
+
+function scene:init()
+	self.sg.name = self.name
+end
+
 --primitive
 --object with transform
 -------------------------------
@@ -1850,6 +1913,79 @@ end
 
 function clear:__tostr()
 	return obj.__tostr(self).." - c:"..self.c
+end
+
+--dot
+--pixel graphic
+-------------------------------
+dot=graphic:subclass({
+	name="dot",
+	c=7,								--color
+	cm=255						--collision mask
+})
+
+function dot:g_draw()
+	if(not self.v) return
+	
+	d_point(
+		self:t().t,
+ 	self.c
+ )
+	
+	graphic.g_draw(self)
+end
+--debug game
+--debugging scene
+
+debug_game=scene:new({
+	name="debug game",
+	cp_axis=nil,
+	pd_axis=nil
+})
+
+--initialization
+-------------------------------
+function debug_game:init()
+	scene.init(self)
+
+	--initial scene clear
+	clear:new(self.sg)
+	camera:new(self.sg,{
+		trs=trs:new(vec2:new(64,64))
+	})
+
+	--debug ui
+	if(debug != nil) then
+		local p1 = poly:fromsprite(self.sg,1,{
+			trs=trs:new(
+				vec2:new(32,64),
+				0,
+				vec2:new(3,3)
+			)
+		})
+
+		local p2 = poly:fromsprite(self.sg,3,{
+			trs=trs:new(
+				vec2:new(96,64),
+				0,
+				vec2:new(4,4)
+			)
+		})
+
+		local cp_axis = dbg_axis:new(self.sg)
+		local pd_axis = dbg_axis:new(self.sg)
+		p1.update = function(self)
+			dot.update(self)
+			
+			local r = col:isect(p1:t(),p1.geo,p2:t(),p2.geo)
+			if r != nil then
+				cp_axis.trs.t = r.cp
+				cp_axis.trs.r = atan2(r.n)
+				pd_axis.trs.t = r.cp+(-r.n*r.pd)
+				pd_axis.trs.r = atan2(r.n)
+			end
+		end
+	end
 end
 
 --map
@@ -2126,6 +2262,7 @@ function move:init()
 	obj.init(self)
 	self.dp = self.dp or vec2:new()
 	self.da = dbg_axis:new(self)
+	self.da.trs.a = true
 end
 
 function move:update()
@@ -2375,26 +2512,6 @@ function missile:trail()
 	})
 end
 
---dot
---pixel graphic
--------------------------------
-dot=graphic:subclass({
-	name="dot",
-	c=7,								--color
-	cm=255						--collision mask
-})
-
-function dot:g_draw()
-	if(not self.v) return
-	
-	d_point(
-		self:t().t,
- 	self.c
- )
-	
-	graphic.g_draw(self)
-end
-
 --laser
 --reflective projectile
 -------------------------------
@@ -2501,11 +2618,11 @@ function circle:draw_stroke()
  	self.sc
  )
 end
-
 --pko_game
---collection of game
---functionality
-pko_game={
+--game scene
+
+pko_game=scene:new({
+	name="pko game",
 	bg=nil,
 
 	layers={
@@ -2520,36 +2637,37 @@ pko_game={
 	pnt_g=nil,
 	test=nil,
 	col_vis=nil
-}
-engine.game=pko_game
+})
 
 --initialization
 -------------------------------
 function pko_game:init()
+	scene.init(self)
+
 	--initial scene clear
-	clear:new(engine.sg)
+	clear:new(self.sg)
 
 	--background
-	self.bg=obj_map:new(engine.sg,{
+	self.bg=obj_map:new(self.sg,{
 		name="background"
 	})
 
 	--layers
 	local la=obj:new(
-		engine.sg,{
+		self.sg,{
 			name="layer: actors"
 		}
 	)
 	
 	local lp=obj:new(
-		engine.sg,
+		self.sg,
 		{
 			name="layer: player"
 		}
 	)
 	
 	local lm=obj:new(
-		engine.sg,
+		self.sg,
 		{
 			name="layer: missiles"
 		}
@@ -2561,7 +2679,7 @@ function pko_game:init()
 
 	--actors
 	spawner:new(
-		engine.sg,{
+		self.sg,{
 		objs={
 			{
 				s=1,
@@ -2583,7 +2701,7 @@ function pko_game:init()
 
 	--debug ui
 	if(debug != nil) then
-		self.pnt_g=dot:new(engine.dev_ui.pw)
+		self.pnt_g=dot:new(engine._dev_ui.pw)
 
 		self.test=circle:new(
 			self.layers.player,{
@@ -2592,9 +2710,11 @@ function pko_game:init()
 			geo=geo:new(8)
 		})
 
-		--dbg_map_col:new(engine.sg)
+		--dbg_map_col:new(self.sg)
 	end
 end
+
+engine:set_active_scene("pko game")
 __gfx__
 0000000007800e806000000d000b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000e8c79182060ee0d000bb3300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

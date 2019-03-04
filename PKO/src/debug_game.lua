@@ -1,44 +1,50 @@
-require("engine")
+--debug game
+--debugging scene
+require("scene")
 require("clear")
 require("poly")
 require("dot")
 
---debug game
---collection of game
---functionality
-
-debug_game={}
-engine.game=debug_game
+debug_game=scene:new({
+	name="debug game",
+	cp_axis=nil,
+	pd_axis=nil
+})
 
 --initialization
 -------------------------------
 function debug_game:init()
+	scene.init(self)
+
 	--initial scene clear
-	clear:new(engine.sg)
+	clear:new(self.sg)
+	camera:new(self.sg,{
+		trs=trs:new(vec2:new(64,64))
+	})
 
 	--debug ui
 	if(debug != nil) then
-		local p1 = poly:fromsprite(engine.dev_ui.pw,1,{
+		local p1 = poly:fromsprite(self.sg,1,{
 			trs=trs:new(
-				vec2:new(),
+				vec2:new(32,64),
 				0,
 				vec2:new(3,3)
 			)
 		})
 
-		local p2 = poly:fromsprite(engine.sg,81,{
+		local p2 = poly:fromsprite(self.sg,3,{
 			trs=trs:new(
-				vec2:new(64,64),
+				vec2:new(96,64),
 				0,
 				vec2:new(4,4)
 			)
 		})
 
-		cp_axis = dbg_axis:new(engine.sg)
-		pd_axis = dbg_axis:new(engine.sg)
-
+		local cp_axis = dbg_axis:new(self.sg)
+		local pd_axis = dbg_axis:new(self.sg)
 		p1.update = function(self)
 			dot.update(self)
+			
 			local r = col:isect(p1:t(),p1.geo,p2:t(),p2.geo)
 			if r != nil then
 				cp_axis.trs.t = r.cp

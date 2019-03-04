@@ -15,8 +15,7 @@ function graphic:draw()
 	if(not self.v) return
 
 	local cp = drawstate:campos()
-	local pos = self:t().t
-	local d = pos - cp
+	local d = self:t().t - cp
 	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
 	
 	self:g_draw()

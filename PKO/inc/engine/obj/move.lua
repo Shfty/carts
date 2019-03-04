@@ -15,6 +15,7 @@ function move:init()
 	obj.init(self)
 	self.dp = self.dp or vec2:new()
 	self.da = dbg_axis:new(self)
+	self.da.trs.a = true
 end
 
 function move:update()

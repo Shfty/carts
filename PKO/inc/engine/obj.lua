@@ -101,11 +101,15 @@ function obj:draw()
 	end
 end
 
-function obj:destroy()
+function obj:detach()
 	if(self.parent) then
 		self.parent:remchild(self)
 		self.parent=nil
 	end
+end
+
+function obj:destroy()
+	self:detach()
 	
 	if(#self.children>0) then
  	while #self.children>0 do

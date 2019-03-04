@@ -14,12 +14,40 @@ require("mouse")
 --functionality
 -------------------------------
 engine={
-	game=nil,
-	sg=obj:new(nil,{
+	_sg=obj:new(nil,{
 		name="root"
 	}),
-	dev_ui=nil
+	_sg_wrap=nil,
+	_dev_ui=nil,
+	_scenes={},
+	_active_scene=nil
 }
+
+engine._sg_wrap = obj:new(
+	engine._sg,
+	{
+		name="scene wrapper"
+	}
+)
+
+function engine:set_active_scene(am)
+	for m in all(self._scenes) do
+		if(m.name == am) then
+			if self._active_scene != nil then
+				self._active_scene.sg:detach()
+			end
+			self._active_scene = m
+			if self._active_scene != nil then
+				self._sg_wrap:addchild(m.sg)
+			end
+			break
+		end
+	end
+end
+
+function engine:get_active_scene()
+	return self._active_scene
+end
 
 --initialization
 -------------------------------
@@ -29,8 +57,8 @@ function _init()
 	print "-------------------"
 
 	print "initializing..."
-	if not engine.game then
-		print "error: no game module loaded"
+	if not engine._active_scene then
+		print "error: no scene loaded"
 		return
 	end
 
@@ -38,7 +66,7 @@ function _init()
 	if(debug != nil) then
 		debug.ts_init_b=time:cpu_t()
 		print "debug ui..."
-		engine.dev_ui=dbg_ui:new(nil)
+		engine._dev_ui=dbg_ui:new(nil)
 	end
 
 	--enable color literals
@@ -49,12 +77,14 @@ function _init()
 	print "collision..."
 	col:init()
 
-	--initialize game
-	print "game..."
-	engine.game:init()
-
+	--initialize scenes
+	print "scenes..."
+	for m in all(engine._scenes) do
+		m:init()
+	end
+	
 	if(debug != nil) then
-		engine.sg:addchild(engine.dev_ui)
+		engine._sg:addchild(engine._dev_ui)
 		debug.ts_init_e=time:cpu_t()
 	end
 end
@@ -62,7 +92,7 @@ end
 --main loop
 -------------------------------
 function _update60()
-	if(not engine.game) return
+	if(not engine._active_scene) return
 	
 	time:update()
 
@@ -79,7 +109,7 @@ function _update60()
 	end
 
 	--update scenegraph
-	engine.sg:update()
+	engine._sg:update()
 
 	if(dm) then
 		debug.ts_update_e=time:cpu_t()
@@ -89,14 +119,15 @@ end
 --render loop
 -------------------------------
 function _draw()
-	if(not engine.game) return
+	if(not engine._active_scene) return
 
 	local dm = debug != nil
 	if(dm) then
 		debug.ts_draw_s=time:cpu_t()
 	end
 
-	engine.sg:draw()
+	-- draw scenegraph
+	engine._sg:draw()
 	
 	if(dm) then
 		debug.ts_draw_e=time:cpu_t()

@@ -27,8 +27,6 @@ function dbg_ui:init()
 		name="wrap"
 	})
 	self.wrap = wrap
-
-	self.pw=pointer:new(self)
 	
 	local bg=box:new(wrap,{
 		trs=trs:new(vec2:new(61,5)),
@@ -49,6 +47,8 @@ function dbg_ui:init()
 	tabs["3"]=
 		dbg_sg:new(wrap)
 	self.tabs=tabs
+
+	self.pw=pointer:new(self.wrap)
 end
 
 function dbg_ui:update()

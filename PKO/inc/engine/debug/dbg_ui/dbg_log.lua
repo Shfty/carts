@@ -1,7 +1,8 @@
-require("dbg_panel")
+
 require("logging")
 require("clip")
 require("rect")
+require("dbg_panel")
 
 --debug log
 -------------------------------

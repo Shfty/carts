@@ -139,6 +139,10 @@ function vec2:__le(rhs)
 		self.y<=rhs
 end
 
+function vec2:copy()
+	return vec2:new(self.x,self.y)
+end
+
 function vec2:sqlen()
 	local sql = 0
 	sql+=self.x^2
