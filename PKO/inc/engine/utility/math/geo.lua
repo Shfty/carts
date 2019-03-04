@@ -54,5 +54,15 @@ end
 end
 
 function geo:calculate_circle()
-	self.cr=self.be:len()
+	self.cr=max(self.be.x,self.be.y)
+end
+
+function geo:__eq(rhs)
+	if(self.cr!=rhs.cr) return false
+	if(self.be!=rhs.be) return false
+	if(#self.vs != #rhs.vs) return false
+	for i = 1, #self.vs do
+		if(self.vs[i] != rhs.vs[i]) return false
+	end
+	return true
 end

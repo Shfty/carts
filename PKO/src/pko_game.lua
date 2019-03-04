@@ -97,5 +97,7 @@ function pko_game:init()
 			r=8,
 			geo=geo:new(8)
 		})
+
+		--dbg_map_col:new(engine.sg)
 	end
 end

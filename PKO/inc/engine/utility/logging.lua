@@ -5,10 +5,8 @@
 -------------------------------
 log_buf = {}
 log_count = 1
-log_limit = 16
+log_limit = 1000
 function log(s)
-	if(debug == nil) return
-
 	local str = log_count..">"
 	str = str..tostr(s)
 	add(log_buf,str)

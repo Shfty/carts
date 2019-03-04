@@ -27,17 +27,95 @@ function resp:flip()
 end
 
 col={
-	sprite_geo={}
+	sprite_geo={},
+	map_geo={}
 }
 
 function col:init(numspr)
 	numspr = numspr or 128
 
+	print("generating sprite collision...")
 	for i=0,numspr-1 do
 		if(fget(i)>0) then
 		 local vs = convex_hull(i)
 			self.sprite_geo[i] =
 				geo:new(vs)
+		end
+	end
+
+	print("generating map collision...")
+	self:generate_map_geo()
+end
+
+function col:generate_map_geo(min,max)
+	min = min or vec2:new(0,0)
+	max = max or vec2:new(63,31)
+	
+	-- create geo for each map tile
+	for y = min.y,max.y do
+		self.map_geo[y+1] = {}
+		for x = min.x,max.x do
+			self.map_geo[y+1][x+1] = {}
+			local p = vec2:new(x,y)
+			local s = mget(p)
+			if s > 0 then
+				self.map_geo[y+1][x+1] = {
+					t=trs:new((p*8)+4),
+					geo=self.sprite_geo[s]
+				}
+			end
+		end
+	end
+
+	local square_geo = geo:new({
+		vec2:new(4,-4),
+		vec2:new(4,4),
+		vec2:new(-4,4),
+		vec2:new(-4,-4),
+	})
+		
+	-- merge vertical lines of square tiles
+	for y = 1,#self.map_geo do
+		for x = 1,#self.map_geo[y] do
+			local sg = self.map_geo[y][x]
+				if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+				for e = y+1,#self.map_geo do
+					local eg = self.map_geo[e][x]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					if(eg.t.s != vec2:new(1,1)) break
+					self.map_geo[e][x] = {ptr=vec2:new(x,y)}
+					local nx = x - 1
+					local ny = y + ((e-y)-1)/2
+					self.map_geo[y][x].t.t =	vec2:new(
+						(nx*8)+4,
+						(ny*8)
+					)
+					self.map_geo[y][x].t.s.y = (e-y)+1
+				end
+			end
+		end
+	end
+
+	-- merge horizontal lines of square tiles
+	for y = 1,#self.map_geo do
+		for x = 1,#self.map_geo[y] do
+			local sg = self.map_geo[y][x]
+			if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+				for e = x+1,#self.map_geo[y] do
+					local eg = self.map_geo[y][e]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					self.map_geo[y][e] = {ptr=vec2:new(x,y)}
+					local nx = x + ((e-x)-1)/2
+					local ny = (y-1)
+					self.map_geo[y][x].t.t =	vec2:new(
+						(nx*8),
+						(ny*8)+4
+					)
+					self.map_geo[y][x].t.s.x = (e-x)+1
+				end
+			end
 		end
 	end
 end
@@ -51,9 +129,9 @@ end
 
 --circle intersect circle
 function col:c_isect_c(at,ar,bt,br)
-	return (bt.t-at.t):len() <=
-								(at.s.x * ar) +
-								(bt.s.x * br)
+	return (bt.t-at.t):len() <
+								(max(at.s.x,at.s.y) * ar) +
+								(max(bt.s.x,bt.s.y) * br)
 end
 
 function col:b_isect_b(at,ae,bt,be)
@@ -67,10 +145,10 @@ function col:b_isect_b(at,ae,bt,be)
 	local b1 = bp - sbe
 	local b2 = bp + sbe
 
-	return a1.x <= b2.x and
-								a2.x >= b1.x and
-								a1.y <= b2.y and
-								a2.y >= b1.y
+	return a1.x < b2.x and
+								a2.x > b1.x and
+								a1.y < b2.y and
+								a2.y > b1.y
 end
 
 --poly intersect poly

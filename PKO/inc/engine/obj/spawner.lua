@@ -20,6 +20,8 @@ function spawner:init()
 		local ps = map_find_sprites(obj.s)
 		for p in all(ps) do
 			mset(p, 0)
+			col.map_geo[p.y+1][p.x+1]={}
+
 			obj.o:new(obj.p,{
 				trs = trs:new((p*8)+4)
 			})

@@ -1,6 +1,8 @@
-dbg_col=obj:subclass()
+dbg_spr_col=obj:subclass({
+	name="debug map collision"
+})
 
-function dbg_col:init()
+function dbg_spr_col:init()
 	obj.init(self)
 	
 	for k,geo in pairs(col.sprite_geo) do
@@ -15,7 +17,7 @@ function dbg_col:init()
 			sc=9,
 			f=false
 		})
-		box:new(engself,{
+		box:new(self,{
 			trs=trs:new(
 				vec2:new(
 					4+(k%16)*10,

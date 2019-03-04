@@ -1,6 +1,7 @@
 require("dbg_ui")
 require("dbg_axis")
-require("dbg_col")
+require("dbg_spr_col")
+require("dbg_map_col")
 
 debug={
 	ts_init_s = 0,

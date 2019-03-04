@@ -81,14 +81,17 @@ function convex_hull(s)
 
 	local sp = sidx2pos(s)
 
-	add(vs,trace_edge(s,1,1,true)-3.5)
-	add(vs,trace_edge(s,-1,1,true)-3.5)
-	add(vs,trace_edge(s,-1,1)-3.5)
-	add(vs,trace_edge(s,-1,-1)-3.5)
-	add(vs,trace_edge(s,-1,-1,true)-3.5)
-	add(vs,trace_edge(s,1,-1,true)-3.5)
-	add(vs,trace_edge(s,1,-1)-3.5)
-	add(vs,trace_edge(s,1,1)-3.5)
+	add(vs,trace_edge(s,1,1,true)-4)
+	add(vs,trace_edge(s,-1,1,true)-4)
+
+	add(vs,trace_edge(s,-1,1)-4)
+	add(vs,trace_edge(s,-1,-1)-4)
+
+	add(vs,trace_edge(s,-1,-1,true)-4)
+	add(vs,trace_edge(s,1,-1,true)-4)
+
+	add(vs,trace_edge(s,1,-1)-4)
+	add(vs,trace_edge(s,1,1)-4)
 
 	for i=#vs,1,-1 do
 		if(not vs[i]) del(vs,vs[i])
@@ -100,6 +103,11 @@ function convex_hull(s)
 		if(v1 == v2) then
 			del(vs,v1)
 		end
+	end
+
+	for v in all(vs) do
+		if(v.x > 0) v.x += 1
+		if(v.y > 0) v.y += 1
 	end
 
 	return vs

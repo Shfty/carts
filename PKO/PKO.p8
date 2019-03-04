@@ -150,10 +150,8 @@ end--logging
 -------------------------------
 log_buf = {}
 log_count = 1
-log_limit = 16
+log_limit = 1000
 function log(s)
-	if(debug == nil) return
-
 	local str = log_count..">"
 	str = str..tostr(s)
 	add(log_buf,str)
@@ -398,14 +396,17 @@ function convex_hull(s)
 
 	local sp = sidx2pos(s)
 
-	add(vs,trace_edge(s,1,1,true)-3.5)
-	add(vs,trace_edge(s,-1,1,true)-3.5)
-	add(vs,trace_edge(s,-1,1)-3.5)
-	add(vs,trace_edge(s,-1,-1)-3.5)
-	add(vs,trace_edge(s,-1,-1,true)-3.5)
-	add(vs,trace_edge(s,1,-1,true)-3.5)
-	add(vs,trace_edge(s,1,-1)-3.5)
-	add(vs,trace_edge(s,1,1)-3.5)
+	add(vs,trace_edge(s,1,1,true)-4)
+	add(vs,trace_edge(s,-1,1,true)-4)
+
+	add(vs,trace_edge(s,-1,1)-4)
+	add(vs,trace_edge(s,-1,-1)-4)
+
+	add(vs,trace_edge(s,-1,-1,true)-4)
+	add(vs,trace_edge(s,1,-1,true)-4)
+
+	add(vs,trace_edge(s,1,-1)-4)
+	add(vs,trace_edge(s,1,1)-4)
 
 	for i=#vs,1,-1 do
 		if(not vs[i]) del(vs,vs[i])
@@ -417,6 +418,11 @@ function convex_hull(s)
 		if(v1 == v2) then
 			del(vs,v1)
 		end
+	end
+
+	for v in all(vs) do
+		if(v.x > 0) v.x += 1
+		if(v.y > 0) v.y += 1
 	end
 
 	return vs
@@ -675,7 +681,17 @@ end
 end
 
 function geo:calculate_circle()
-	self.cr=self.be:len()
+	self.cr=max(self.be.x,self.be.y)
+end
+
+function geo:__eq(rhs)
+	if(self.cr!=rhs.cr) return false
+	if(self.be!=rhs.be) return false
+	if(#self.vs != #rhs.vs) return false
+	for i = 1, #self.vs do
+		if(self.vs[i] != rhs.vs[i]) return false
+	end
+	return true
 end
 
 --collision
@@ -703,17 +719,95 @@ function resp:flip()
 end
 
 col={
-	sprite_geo={}
+	sprite_geo={},
+	map_geo={}
 }
 
 function col:init(numspr)
 	numspr = numspr or 128
 
+	print("generating sprite collision...")
 	for i=0,numspr-1 do
 		if(fget(i)>0) then
 		 local vs = convex_hull(i)
 			self.sprite_geo[i] =
 				geo:new(vs)
+		end
+	end
+
+	print("generating map collision...")
+	self:generate_map_geo()
+end
+
+function col:generate_map_geo(min,max)
+	min = min or vec2:new(0,0)
+	max = max or vec2:new(63,31)
+	
+	-- create geo for each map tile
+	for y = min.y,max.y do
+		self.map_geo[y+1] = {}
+		for x = min.x,max.x do
+			self.map_geo[y+1][x+1] = {}
+			local p = vec2:new(x,y)
+			local s = mget(p)
+			if s > 0 then
+				self.map_geo[y+1][x+1] = {
+					t=trs:new((p*8)+4),
+					geo=self.sprite_geo[s]
+				}
+			end
+		end
+	end
+
+	local square_geo = geo:new({
+		vec2:new(4,-4),
+		vec2:new(4,4),
+		vec2:new(-4,4),
+		vec2:new(-4,-4),
+	})
+		
+	-- merge vertical lines of square tiles
+	for y = 1,#self.map_geo do
+		for x = 1,#self.map_geo[y] do
+			local sg = self.map_geo[y][x]
+				if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+				for e = y+1,#self.map_geo do
+					local eg = self.map_geo[e][x]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					if(eg.t.s != vec2:new(1,1)) break
+					self.map_geo[e][x] = {ptr=vec2:new(x,y)}
+					local nx = x - 1
+					local ny = y + ((e-y)-1)/2
+					self.map_geo[y][x].t.t =	vec2:new(
+						(nx*8)+4,
+						(ny*8)
+					)
+					self.map_geo[y][x].t.s.y = (e-y)+1
+				end
+			end
+		end
+	end
+
+	-- merge horizontal lines of square tiles
+	for y = 1,#self.map_geo do
+		for x = 1,#self.map_geo[y] do
+			local sg = self.map_geo[y][x]
+			if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+				for e = x+1,#self.map_geo[y] do
+					local eg = self.map_geo[y][e]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					self.map_geo[y][e] = {ptr=vec2:new(x,y)}
+					local nx = x + ((e-x)-1)/2
+					local ny = (y-1)
+					self.map_geo[y][x].t.t =	vec2:new(
+						(nx*8),
+						(ny*8)+4
+					)
+					self.map_geo[y][x].t.s.x = (e-x)+1
+				end
+			end
 		end
 	end
 end
@@ -727,9 +821,9 @@ end
 
 --circle intersect circle
 function col:c_isect_c(at,ar,bt,br)
-	return (bt.t-at.t):len() <=
-								(at.s.x * ar) +
-								(bt.s.x * br)
+	return (bt.t-at.t):len() <
+								(max(at.s.x,at.s.y) * ar) +
+								(max(bt.s.x,bt.s.y) * br)
 end
 
 function col:b_isect_b(at,ae,bt,be)
@@ -743,10 +837,10 @@ function col:b_isect_b(at,ae,bt,be)
 	local b1 = bp - sbe
 	local b2 = bp + sbe
 
-	return a1.x <= b2.x and
-								a2.x >= b1.x and
-								a1.y <= b2.y and
-								a2.y >= b1.y
+	return a1.x < b2.x and
+								a2.x > b1.x and
+								a1.y < b2.y and
+								a2.y > b1.y
 end
 
 --poly intersect poly
@@ -1608,9 +1702,11 @@ function dbg_axis:g_draw()
 		8
 	)
 end
-dbg_col=obj:subclass()
+dbg_spr_col=obj:subclass({
+	name="debug map collision"
+})
 
-function dbg_col:init()
+function dbg_spr_col:init()
 	obj.init(self)
 	
 	for k,geo in pairs(col.sprite_geo) do
@@ -1625,7 +1721,7 @@ function dbg_col:init()
 			sc=9,
 			f=false
 		})
-		box:new(engself,{
+		box:new(self,{
 			trs=trs:new(
 				vec2:new(
 					4+(k%16)*10,
@@ -1646,6 +1742,91 @@ function dbg_col:init()
 		})
 	end
 end
+
+--poly
+--n-sided shape
+-------------------------------
+poly=shape:subclass({
+	name="poly",
+	vs=nil							--vertices
+})
+
+function poly:init()
+	shape.init(self)
+	self.vs = self.vs or {}
+end
+
+function poly:fromsprite(p,s,t)
+	print(#col.sprite_geo)
+	t = t or {}
+	t.geo=col.sprite_geo[s]
+	t.cm=fget(s)
+	return poly:new(p,t)
+end
+
+function poly:draw_stroke()
+	local p = self:t().t
+	local s = self:t().s
+	local vs = self.geo.vs
+
+	for i=1,#vs do
+		local v1 = vs[i]*s
+		local vp1 = v1 + p
+		local v2 = vs[i+1] or vs[1]
+		v2 *= s
+		local vp2 = v2 + p
+
+		if(v1.x > 0) vp1.x -= 1
+		if(v1.y > 0) vp1.y -= 1
+		if(v2.x > 0) vp2.x -= 1
+		if(v2.y > 0) vp2.y -= 1
+
+		d_line(vp1,vp2,self.sc)
+	end
+
+	for i=1,#vs do
+		local v1 = vs[i]*s
+		local vp1 = v1 + p
+		if(v1.x > 0) vp1.x -= 1
+		if(v1.y > 0) vp1.y -= 1
+
+		d_point(vp1,8)
+	end
+end
+
+dbg_map_col=obj:subclass({
+	name="debug map collision"
+})
+
+function dbg_map_col:init()
+	obj.init(self)
+	
+	for y in all(col.map_geo) do
+		for x in all(y) do
+			if x.geo != nil then
+				poly:new(self,{
+					trs=x.t,
+					geo=x.geo
+				})
+				
+				circle:new(self,{
+					trs=x.t,
+					r=x.geo.cr,
+					sc=9,
+					f=false
+				})
+
+				box:new(self,{
+					trs=x.t,
+					sz=x.geo.be,
+					sc=11,
+					f=false
+				})
+			end
+		end
+	end
+end
+
 debug={
 	ts_init_s = 0,
 	ts_init_e = 0,
@@ -1786,19 +1967,24 @@ end
 function map_isect(ot,og)
 	local op = ot.t
 	local ocr = og.cr
-	local o1 = op - ocr
-	local o2 = op + ocr
-	local ss = map_sprites_in(o1,o2)
+	local o1 = mpos2tile(op - ocr)
+	local o2 = mpos2tile(op + ocr)
 
 	local crs = {}
-	for s in all(ss) do
-		local r = col:isect(
-			ot,
-			og,
-			s.trs,
-			col.sprite_geo[s.s]
-		)
-		if(r) add(crs,r)
+	for y = max(o1.y+1,1),o2.y+1 do
+		for x = max(o1.x+1,1),o2.x+1 do
+			local mg = col.map_geo[y][x]
+			if(mg.ptr) mg = col.map_geo[mg.ptr.y][mg.ptr.x]
+			if(mg.geo != nil) then
+				local r = col:isect(
+					ot,
+					og,
+					mg.t,
+					mg.geo
+				)
+				if(r) add(crs,r)
+			end
+		end
 	end
 
 	return crs
@@ -1859,6 +2045,8 @@ function spawner:init()
 		local ps = map_find_sprites(obj.s)
 		for p in all(ps) do
 			mset(p, 0)
+			col.map_geo[p.y+1][p.x+1]={}
+
 			obj.o:new(obj.p,{
 				trs = trs:new((p*8)+4)
 			})
@@ -2156,8 +2344,8 @@ function missile:init()
 		a=self.sa,
 		s=self.ss
 	})
-	self:graphic()
 	self:trail()
+	self:graphic()
 end
 
 function missile:update()
@@ -2175,7 +2363,10 @@ function missile:update()
 end
 
 function missile:graphic()
-	return circle:new(self)
+	return circle:new(self,{
+		sc=6,
+		fc=7
+	})
 end
 
 function missile:trail()
@@ -2297,7 +2488,7 @@ function circle:draw_fill()
 	local t = self:t()
 	f_circ(
 		t.t,
-		self.r * t.s.x,
+		self.r * max(t.s.x,t.s.y),
  	self.fc
  )
 end
@@ -2306,7 +2497,7 @@ function circle:draw_stroke()
 	local t = self:t()
 	s_circ(
 		t.t,
-		self.r * t.s.x,
+		self.r * max(t.s.x,t.s.y),
  	self.sc
  )
 end
@@ -2400,6 +2591,8 @@ function pko_game:init()
 			r=8,
 			geo=geo:new(8)
 		})
+
+		--dbg_map_col:new(engine.sg)
 	end
 end
 __gfx__
@@ -2460,7 +2653,7 @@ dddddddd555555551111111100000000000000000000000000000000000000000000000000000000
 000000dd555555551100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000d111111111000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __gff__
-0003020400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001010100000000000000000000000000010101000000000000000000000000000101010000000000000000000000000000000000000000000000000000000000
+0003020400000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000001010100000000000000000000000000010001000000000000000000000000000101010000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 __map__
 5151616161616161616161616161515151516161616161616161616161616161616161616161616161616161616161616161616161616161616161616161515100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2470,8 +2663,8 @@ __map__
 5200000000000000000000000000005052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000000000000000000000005052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000000000000000000000006062000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-5200000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+5200000000000000000002000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000000000000000000000004042000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000000001000000000000005052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 5200000000404141414200000000005052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

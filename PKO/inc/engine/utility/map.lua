@@ -70,19 +70,24 @@ end
 function map_isect(ot,og)
 	local op = ot.t
 	local ocr = og.cr
-	local o1 = op - ocr
-	local o2 = op + ocr
-	local ss = map_sprites_in(o1,o2)
+	local o1 = mpos2tile(op - ocr)
+	local o2 = mpos2tile(op + ocr)
 
 	local crs = {}
-	for s in all(ss) do
-		local r = col:isect(
-			ot,
-			og,
-			s.trs,
-			col.sprite_geo[s.s]
-		)
-		if(r) add(crs,r)
+	for y = max(o1.y+1,1),o2.y+1 do
+		for x = max(o1.x+1,1),o2.x+1 do
+			local mg = col.map_geo[y][x]
+			if(mg.ptr) mg = col.map_geo[mg.ptr.y][mg.ptr.x]
+			if(mg.geo != nil) then
+				local r = col:isect(
+					ot,
+					og,
+					mg.t,
+					mg.geo
+				)
+				if(r) add(crs,r)
+			end
+		end
 	end
 
 	return crs

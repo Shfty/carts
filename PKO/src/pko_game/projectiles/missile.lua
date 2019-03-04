@@ -19,8 +19,8 @@ function missile:init()
 		a=self.sa,
 		s=self.ss
 	})
-	self:graphic()
 	self:trail()
+	self:graphic()
 end
 
 function missile:update()
@@ -38,7 +38,10 @@ function missile:update()
 end
 
 function missile:graphic()
-	return circle:new(self)
+	return circle:new(self,{
+		sc=6,
+		fc=7
+	})
 end
 
 function missile:trail()
