@@ -1,23 +1,30 @@
+require("p8_redefs")
+require("logging")
+require("obj")
+
+require("time")
+require("collision")
+
+require("controller")
+require("keyboard")
+require("mouse")
+
 --engine
 --collection of engine
 --functionality
 -------------------------------
-require("engine/utility")
-require("engine/obj")
-require("engine/debug")
-
 engine={
 	game=nil,
 	sg=obj:new(nil,{
 		name="root"
 	}),
-	dev_mode=true,
 	dev_ui=nil
 }
 
 --initialization
 -------------------------------
 function _init()
+	cls()
 	print "ko engine"
 	print "-------------------"
 
@@ -26,21 +33,29 @@ function _init()
 		print "error: no game module loaded"
 		return
 	end
+
 	
-	if(engine.dev_mode) then
-		ts_init_b=time:cpu_t()
+	if(debug != nil) then
+		debug.ts_init_b=time:cpu_t()
+		print "debug ui..."
 		engine.dev_ui=dbg_ui:new(nil)
 	end
 
+	--enable color literals
+	print "color literals..."
+	poke(0x5f34,1)
+
 	--initialize engine
+	print "collision..."
 	col:init()
 
 	--initialize game
+	print "game..."
 	engine.game:init()
 
-	if(engine.dev_mode) then
+	if(debug != nil) then
 		engine.sg:addchild(engine.dev_ui)
-		ts_init_e=time:cpu_t()
+		debug.ts_init_e=time:cpu_t()
 	end
 end
 
@@ -51,9 +66,9 @@ function _update60()
 	
 	time:update()
 
-	local dm = engine.dev_mode
+	local dm = debug != nil
 	if(dm) then
-		ts_update_s=time:cpu_t()
+		debug.ts_update_s=time:cpu_t()
 	end
 
 	--update input
@@ -67,7 +82,7 @@ function _update60()
 	engine.sg:update()
 
 	if(dm) then
-		ts_update_e=time:cpu_t()
+		debug.ts_update_e=time:cpu_t()
 	end
 end
 
@@ -76,14 +91,14 @@ end
 function _draw()
 	if(not engine.game) return
 
-	local dm = engine.dev_mode
+	local dm = debug != nil
 	if(dm) then
-		ts_draw_s=time:cpu_t()
+		debug.ts_draw_s=time:cpu_t()
 	end
 
 	engine.sg:draw()
 	
 	if(dm) then
-		ts_draw_e=time:cpu_t()
+		debug.ts_draw_e=time:cpu_t()
 	end
 end

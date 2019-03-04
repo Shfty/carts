@@ -2,16 +2,24 @@
 -------------------------------
 dbg_panel=graphic:subclass({
 	name="debug panel",
-	pos=vec2:new(0,8),
-	sz=vec2:new(123,115),
+	sz=nil,
 	sy=0,
 	key=nil,
 	v=false
 })
 
 function dbg_panel:init()
+	self.trs = self.trs or
+												trs:new(
+													vec2:new(61,66)
+												)
+
 	graphic.init(self)
-	local bg=box:new(self,{
+
+	self.sz = self.sz or
+												vec2:new(61,56)
+
+	box:new(self,{
 		sz=self.sz,
 		sc=0x1107.0000,
 		fc=0x1100.5a5a

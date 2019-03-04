@@ -1,3 +1,5 @@
+require("prim")
+
 --graphic
 --primitive with visual element
 -------------------------------
@@ -13,7 +15,7 @@ function graphic:draw()
 	if(not self.v) return
 
 	local cp = drawstate:campos()
-	local pos = self:getpos()
+	local pos = self:t().t
 	local d = pos - cp
 	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
 	
@@ -29,10 +31,3 @@ function graphic:col_mask(m)
 	m = m or 255
 	return band(self.cm,m) > 0
 end
-
-require("graphic/dot")
-require("graphic/map")
-require("graphic/shape")
-require("graphic/sprite")
-require("graphic/line")
-require("graphic/text")

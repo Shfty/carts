@@ -1,3 +1,6 @@
+require("prim")
+require("proj_move")
+
 --missile
 --homing projectile
 -------------------------------
@@ -12,11 +15,11 @@ missile=prim:subclass({
 
 function missile:init()
 	prim.init(self)
-	circle:new(self)
 	self.mc=proj_move:new(self,{
 		a=self.sa,
 		s=self.ss
 	})
+	self:graphic()
 	self:trail()
 end
 
@@ -28,11 +31,14 @@ function missile:update()
 	
 	prim.update(self)
 
-	local pos = self:getpos()
-	local cm = self.cm
-	if(pko_game.bg:contains(pos, cm)) then
+	local p = self:t().t
+	if(map_contains(p, self.cm)) then
 		self:destroy()
 	end
+end
+
+function missile:graphic()
+	return circle:new(self)
 end
 
 function missile:trail()

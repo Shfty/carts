@@ -1,31 +1,32 @@
+require("actor")
+require("octo_move")
+require("trail")
+require("camera")
+require("missile")
+require("laser")
+
 --pko
 --player avatar
 -------------------------------
-pko=prim:subclass({
+pko=actor:subclass({
 	name="pko",
-	pos=vec2:new(64,64),
-	geo=nil,
+	s=1,
 	mc=nil,	--move component
-	sc=nil,	--sprite component
 	tc=nil,	--trail component
 	cc=nil		--camera component
 })
 
 function pko:init()
-	prim.init(self)
+	actor.init(self)
 
-	self.sc=sprite:new(self,{
-		s=1
-	})
-	self.geo = geo:new(col.sprite_geo[1].vs)
-	self.geo:calculate_circle()
-	self.geo.vs = nil
 	self.mc=octo_move:new(self,{
-		geo=self.geo
+		geo=self._geo
 	})
-
 	self.tc=trail:new(self)
-	self.cc=camera:new(self)
+	self.cc=camera:new(self,{
+		min=vec2:new(0,0),
+		max=vec2:new(386,128)
+	})
 end
 
 function pko:update()
@@ -34,15 +35,22 @@ function pko:update()
 	if(controller.ap) then
 		self:burst(missile,16)
 	end
+
+	if(controller.bp) then
+		self:burst(laser,16)
+	end
  
 	prim.update(self)
 end
 
 function pko:burst(t,num)
 	for i=0,num-1 do
-		t:new(pko_game.l_ms,{
-			pos=self.pos,
-			sa=i/num
-		})
+		t:new(
+			pko_game.layers.missiles,
+			{
+				trs=trs:new(self.trs.t),
+				sa=i/num
+			}
+		)
 	end
 end

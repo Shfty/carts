@@ -1,3 +1,7 @@
+require("dbg_panel")
+require("clip")
+require("rect")
+
 --debug log
 -------------------------------
 dbg_log=dbg_panel:subclass({
@@ -16,7 +20,7 @@ function dbg_log:init()
 	self.cw = cw
 	
 	self.tw=text:new(cw,{
-		pos=vec2:new(2,2)
+		trs=trs:new(vec2:new(-58,-54))
 	})
 end
 
@@ -31,6 +35,6 @@ function dbg_log:update()
 	end
 	
 	local tw = self.tw
-	tw.pos.y=2-self.sy
+	tw.trs.t.y=-54-self.sy
 	tw.str=str
 end

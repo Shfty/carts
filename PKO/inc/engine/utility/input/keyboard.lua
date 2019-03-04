@@ -1,3 +1,5 @@
+require("input")
+
 --controller
 --wrapper for keyboard input
 -------------------------------

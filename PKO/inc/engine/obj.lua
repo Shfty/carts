@@ -42,8 +42,8 @@ function obj:is_a(t)
 end
 
 function obj:init()
-	self.children = {}
 	obj_count+=1
+	self.children = {}
 end
 
 function obj:addchild(c)
@@ -115,8 +115,3 @@ function obj:destroy()
 	
 	obj_count-=1
 end
-
-require("obj/clear")
-require("obj/clip")
-require("obj/prim")
-require("obj/move")

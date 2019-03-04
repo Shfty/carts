@@ -2,22 +2,6 @@
 --wrapper for pico8 sprite
 --functionality
 -------------------------------
-_old_sget = sget
-function sget(pos)
-	return _old_sget(pos.x,pos.y)
-end
-
-_old_spr = spr
-function spr(s,p,sz)
-	return _old_spr(
-		s,
-		p.x,
-		p.y,
-		sz.x,
-		sz.y
-	)
-end
-
 --sprite pos > sprite index
 --@spos vec2 sprite pixel coords
 --@return number sprite index
@@ -97,14 +81,14 @@ function convex_hull(s)
 
 	local sp = sidx2pos(s)
 
-	add(vs,trace_edge(s,1,1,true)-4)
-	add(vs,trace_edge(s,-1,1,true)-4)
-	add(vs,trace_edge(s,-1,1)-4)
-	add(vs,trace_edge(s,-1,-1)-4)
-	add(vs,trace_edge(s,-1,-1,true)-4)
-	add(vs,trace_edge(s,1,-1,true)-4)
-	add(vs,trace_edge(s,1,-1)-4)
-	add(vs,trace_edge(s,1,1)-4)
+	add(vs,trace_edge(s,1,1,true)-3.5)
+	add(vs,trace_edge(s,-1,1,true)-3.5)
+	add(vs,trace_edge(s,-1,1)-3.5)
+	add(vs,trace_edge(s,-1,-1)-3.5)
+	add(vs,trace_edge(s,-1,-1,true)-3.5)
+	add(vs,trace_edge(s,1,-1,true)-3.5)
+	add(vs,trace_edge(s,1,-1)-3.5)
+	add(vs,trace_edge(s,1,1)-3.5)
 
 	for i=#vs,1,-1 do
 		if(not vs[i]) del(vs,vs[i])

@@ -1,3 +1,5 @@
+require("obj")
+
 --primitive
 --object with transform
 -------------------------------

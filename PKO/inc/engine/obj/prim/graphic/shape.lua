@@ -1,3 +1,5 @@
+require("graphic")
+
 --shape
 --graphic with
 --stroke/fill colors
@@ -25,7 +27,3 @@ end
 
 function shape:draw_fill()
 end
-
-require("shape/box")
-require("shape/circle")
-require("shape/poly")

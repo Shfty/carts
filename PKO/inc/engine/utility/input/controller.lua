@@ -1,3 +1,6 @@
+require("input")
+require("vec2")
+
 --controller
 --wrapper for pico8 gamepad
 -------------------------------

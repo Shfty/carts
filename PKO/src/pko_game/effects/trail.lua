@@ -1,3 +1,5 @@
+require("graphic")
+
 --trail
 --line strip trail effect
 -------------------------------
@@ -13,14 +15,14 @@ trail=graphic:subclass({
 function trail:init()
 	prim:init()
 	self.ds={}
-	local pos=self:getpos()
+	local pos=self:t().t
 	for i=1,self.ld-1 do
 		add(self.ds,pos)
 	end
 end
 
 function trail:update()
-	local pos = self:getpos()
+	local pos = self:t().t
 	local dp = pos-self.ds[#self.ds]
  self.md = dp:len()/(self.ln/self.ld)
  
@@ -35,14 +37,14 @@ function trail:update()
 end
 
 function trail:g_draw()
-	local pos = self:getpos()
+	local pos = self:t().t
 
 	for i=1,self.ld-1 do
 		local p=1-(i/self.ld)
 		local c=self.cs[ceil(p*#self.cs)]
 
 		local fp=self.ds[i]
-		local tp=self.ds[i+1] or self:getpos()
+		local tp=self.ds[i+1] or self:t().t
 		d_line(fp,tp,c)
 	end
 	

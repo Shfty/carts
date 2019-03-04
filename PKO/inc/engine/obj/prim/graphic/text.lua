@@ -1,3 +1,5 @@
+require("graphic")
+
 --text
 --text graphic
 -------------------------------
@@ -11,7 +13,7 @@ function text:g_draw()
 	
 	print(
 		self.str,
-		self:getpos()
+		self:t().t
 	)
 	
 	graphic.g_draw(self)

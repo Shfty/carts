@@ -1,3 +1,5 @@
+require("vec2")
+
 geo={
 	name="geo",
 	vs=nil,				--vertices
@@ -35,7 +37,7 @@ end
 			bmin = vec2:new(v.x,v.y)
 		else
 			if(bmin.x > v.x) bmin.x = v.x
-			if(bmin.y > v.y) bmin.x = v.x
+			if(bmin.y > v.y) bmin.y = v.y
 		end
 		if(bmax == nil) then
 			bmax = vec2:new(v.x,v.y)

@@ -1,3 +1,7 @@
+require("sprites")
+require("vec2")
+require("geo")
+
 --collision
 --wrapper for collision
 --functionality
@@ -17,14 +21,13 @@ function resp:new(n,pd,cp)
 	}, self)
 end
 
-function resp:__tostr()
-	return "n:"..self.n:__tostr()..
-		",pd:"..self.pd
+function resp:flip()
+	self.n = -self.n
+	self.cp += self.n*self.pd
 end
 
 col={
-	sprite_geo={},
-	debug=true
+	sprite_geo={}
 }
 
 function col:init(numspr)
@@ -35,391 +38,139 @@ function col:init(numspr)
 		 local vs = convex_hull(i)
 			self.sprite_geo[i] =
 				geo:new(vs)
-
-			if(self.debug) then
-				circle:new(l_pl,{
-					pos=vec2:new(
-						(i%16)*10,
-						flr(i/16)*10
-					),
-					r=self.sprite_geo[i].cr,
-					sc=9,
-					f=false
-				})
-				box:new(l_pl,{
-					pos=vec2:new(
-						(i%16)*10,
-						flr(i/16)*10
-					),
-					sz=self.sprite_geo[i].be*2,
-					sc=11,
-					f=false
-				})
-				poly:fromsprite(l_pl,i,{
-					pos=vec2:new(
-						(i%16)*10,
-						flr(i/16)*10
-					)
-				})
-			end
 		end
 	end
 end
 
 --unified collision test
-function col:isect(ap,ag,bp,bg)
-	r = r or false
-
-	--use circle-circle to early out
-	local cc = self:c_isect_c(ap,ag.cr,bp,bg.cr)
-	if(not cc) return nil
-
-	--if neither geo has a box,
-	--return the circle-circle result
-	if(not ag.be and not bg.be) return cc
-
-	--if both geos have a box
-	--test box-box
-	local bb = nil
-	if(ag.be and bg.be) then
-		bb = self:b_isect_b(ap,ag.be,bp,bg.be)
-		if (not bb) return nil
-	end
-
-	-- one geo has a box,
-	-- test circle-box
-	local bc = nil
-	if(not ag.be and bg.be) then
-		bc = self:c_isect_b(ap,ag.cr,bp,bg.be)
-	else
-		bc = self:c_isect_b(bp,bg.cr,ap,ag.be)
-		if (bc) bc.n = -bc.n
-	end
-	if (not bc) return nil
-
-	--if neither geo has a poly,
-	--return the box/circle result
-	if(not ag.vs and not bg.vs) return bb or bc
-
-	--if both geos have a poly,
-	--test poly-poly
-	local pp = nil
-	if(ag.vs and bg.vs) then
-		pp = self:py_isect_py(ap,ag.vs,bp,bg.vs)
-		if (not pp) return nil
-	end
-
-	-- one geo has a poly
-	local pr = nil
-	if(not ag.vs and bg.vs) then
-		if(ag.be) then
-			pr = self:b_isect_py(ap,ag.be,bp,bg.vs)
-		else
-			pr = self:c_isect_py(ap,ag.cr,bp,bg.vs)
-		end
-	else
-		if(bg.be) then
-			pr = self:b_isect_py(bp,bg.be,ap,ag.vs)
-		else
-			assert(ag.vs != nil)
-			pr = self:c_isect_py(bp,bg.cr,ap,ag.vs)
-		end
-
-		if(pr) pr.n = -pr.n
-	end
-
-	return pr
-end
-
---point in circle
-function col:p_in_c(p,cp,cr)
-	return (p - cp):len() <= cr
-end
-
---point in box
-function col:p_in_b(p,bp,be)
-	local bmin = bp - be
-	local bmax = bp + be
-
-	local x = p.x >= bmin.x and
-											p.x <= bmax.x
-
-	local y = p.y >= bmin.y and
-											p.y <= bmax.y
-
-	return x and y
-end
-
---point in polygon
-function col:p_in_py(p,pp,pvs)
-	local c=true
-
-	for i=1,#pvs do
-		local v1 = pvs[i]
-		v1 += pp
-
-		local v2 =
-		pvs[i+1] or pvs[1]
-		v2 += pp
-
-		local d = v2-v1
-		d=d:normalize()
-		local n=d:perp_ccw()
-
-		if(n:dot(p-v1)>0) then
-			c=false
-		end
-	end
-
-	return c
-end
-
---point in sprite
-function col:p_in_s(p,s)
-	local d = p-s:getpos()
-	local ms = s.sz*8
-
-	if(d.x < 0 or	d.y < 0) return nil
-	if(d.x > ms.x or	d.y > ms.y) return nil
-
-	--get spritesheet coords
-	local sp = sidx2pos(s.s)
-
-	if sget(sp+d) > 0 then
-		return resp:new()
-	end
+function col:isect(at,ag,bt,bg)
+	if(not self:c_isect_c(at,ag.cr,bt,bg.cr)) return nil
+	if(not self:b_isect_b(at,ag.be,bt,bg.be)) return nil
+	return self:py_isect_py(at,ag.vs,bt,bg.vs)
 end
 
 --circle intersect circle
-function col:c_isect_c(ap,ar,bp,br)
-	local d = bp-ap
-	local dl = d:len()
-	local dn = d:normalize();
-	local tr = ar + br
-	if dl <= tr then
-		return resp:new(
-			-dn,
-			tr-dl,
-			bp - dn * br
-		)
-	end
+function col:c_isect_c(at,ar,bt,br)
+	return (bt.t-at.t):len() <=
+								(at.s.x * ar) +
+								(bt.s.x * br)
 end
 
---circle intersect box
-function col:c_isect_b(cp,cr,bp,be)
-	vs={
-		bp-be,
-		bp+vec2:new(be.x,-be.y),
-		bp+be,
-		bp+vec2:new(-be.x,be.y)
-	}
+function col:b_isect_b(at,ae,bt,be)
+	local ap = at.t
+	local bp = bt.t
+	local sae = ae * at.s
+	local sbe = be * bt.s
 
-	local d = bp - cp
-	local dn = d:normalize()
+	local a1 = ap - sae
+	local a2 = ap + sae
+	local b1 = bp - sbe
+	local b2 = bp + sbe
 
-	local md = nil
-	for i=1,4 do
-		local v = vs[i]
-		local pv = dn:dot(v-cp)
-		if md == nil or pv < md then
-			md = pv
-		end
-	end
-
-	if(md < cr) then
-	local x = true
-		x = x and cp.x >= bp.x-be.x
-		x = x and cp.x <= bp.x+be.x
-
-		local y = true
-		y = y and cp.y >= bp.y-be.y
-		y = y and cp.y <= bp.y+be.y
-
-		local n = -dn
-		if(x and not y) n.x = 0
-		if(y and not x) n.y = 0
-
-		return resp:new(
-			n,
-			cr - md,
-			cp + (dn * md)
-		)
-	end
-end
-
---circle intersect poly
-function col:c_isect_py(cp,cr,pp,pvs)
-	local d = pp - cp
-	local dn = d:normalize()
-
-	local pmin = nil
-	for v in all(pvs) do
-		local pv = dn:dot(pp+v-cp)
-		if pmin == nil or pv < pmin then
-			pmin=pv
-		end
-	end
-
-	if(pmin <= cr) then
-		ic = cp+dn*pmin
-		return resp:new(
-			-dn,
-			cr-pmin,
-			cp + (dn*pmin)
-		)
-	end
-end
-
---box intersect box
-function col:b_isect_b(ap,ae,bp,be)
-	local a1 = ap - ae
-	local a2 = ap + ae
-	local b1 = bp - be
-	local b2 = bp + be
-
-	local isect = a1.x <= b2.x and
-															a2.x >= b1.x and
-															a1.y <= b2.y and
-															a2.y >= b1.y
-
-	if isect then
-		local mib = vec2:new(max(a1.x,b1.x),max(a1.y,b1.y))
-		local mab = vec2:new(min(a2.x,b2.x),min(a2.y,b2.y))
-		local ic = (mib+mab)/2
-		local ms = mab-mib
-
-		local d = ic-bp
-
-		local n = vec2:new()
-		local pd = 0
-		local cp = 0
-
-		if(abs(d.x * (be.y/be.x)) >= abs(d.y)) then
-			n.x = sgn(d.x)
-			pd=ms.x
-			cp = bp + vec2:new(n.x * be.x,d.y)
-		else
-			n.y = sgn(d.y)
-			pd=ms.y
-			cp = bp + vec2:new(d.x,n.y * be.y)
-		end
-
-		return resp:new(
-			n,
-			pd,
-			cp
-		)
-	end
-end
-
---box intersect poly
-function col:b_isect_py(bp,be,pp,pvs)
-	bvs={
-		bp-be,
-		bp+vec2:new(be.x,-be.y),
-		bp+be,
-		bp+vec2:new(-be.x,be.y)
-	}
-
-	local d = pp - bp
-	local dn = d:normalize()
-
-	local bmax = nil
-	for i=1,4 do
-		local v = bvs[i]
-		local pv = dn:dot(v-bp)
-		if bmax == nil or pv > bmax then
-			bmax = pv
-		end
-	end
-
-	local pmin = nil
-	for v in all(pvs) do
-		local pv = dn:dot(pp+v-bp)
-		if pmin == nil or pv < pmin then
-			pmin=pv
-		end
-	end
-
-	log(dn*pmin)
-
-	if(pmin <= bmax) then
-		ic = bp+dn*bmax
-		return self:py_resp(ic,pp,pvs)
-	end
+	return a1.x <= b2.x and
+								a2.x >= b1.x and
+								a1.y <= b2.y and
+								a2.y >= b1.y
 end
 
 --poly intersect poly
-function col:py_isect_py(ap,avs,bp,bvs)
-	local d = bp - ap
+function col:py_isect_py(at,avs,bt,bvs)
+	local ap = at.t
+	local as = at.s
+	local bp = bt.t
+	local bs = bt.s
+	local d = ap - bp
 	local dn = d:normalize()
 
-	local amax = nil
+	local f = self:py_get_face(ap,bt,bvs)
+	local fv1 = f.v1
+	local fv2 = f.v2
+	local fd = fv2 - fv1
+	local fdn = fd:normalize()
+	local fn = fdn:perp_ccw()
+
+	local lscd = d - fv1
+	local lecd = d - fv2
+	
+	local clp = fdn:dot(lscd)
+	local rn = fn
+	
+	if(clp < 0) then
+		rn = (d-fv1):normalize()
+	end
+
+	if(clp > fd:len()) then
+		rn = (d-fv2):normalize()
+	end
+
+	local amin = nil
 	for v in all(avs) do
-		local apr = dn:dot(v)
-		if amax==nil or amax < apr then
-			amax = apr
+		local apr = rn:dot(v*as)
+		if amin==nil or amin > apr then
+			amin = apr
 		end
 	end
 
-	local bmin = nil
+	local bmax = nil
 	for v in all(bvs) do
-		local bpr = dn:dot(bp+v-ap)
-		if bmin==nil or bmin > bpr then
-			bmin = bpr
+		local bpr = rn:dot(bp+(v*bs)-ap)
+		if bmax==nil or bmax < bpr then
+			bmax = bpr
 		end
 	end
 
-	if(amax >= bmin) then
-		local ic = ap + (dn*amax)
-		return self:py_resp(ic,bp,bvs)
+	if(amin < bmax) then
+		local fp = fdn:dot(d-fv1)
+
+		local rcp = bp + fv1 + (fdn * fp)
+		
+		if(clp < 0) then
+			rn = (d-fv1):normalize()
+			rcp = bp + fv1
+		end
+
+		if(clp > fd:len()) then
+			rn = (d-fv2):normalize()
+			rcp = bp + fv2
+		end
+
+		return resp:new(
+			rn,
+			bmax - amin,
+			rcp
+		)
 	end
 end
 
-function col:py_resp(p,pp,pvs)
-	local li = 0
+function col:py_get_face(p,pt,pvs)
+	local pp = pt.t
+	local ps = pt.s
+
+	local d = p - pp
+	local dn = d:normalize()
+	local da = atan2(dn)
 
 	for i=1,#pvs do
-		local v1 = pvs[i] + pp
-		local v2 =	pvs[i+1] or pvs[1]
-		v2 += pp
+		local v1 = pvs[i]*ps
+		local v2 = pvs[i+1] or pvs[1]
+		v2 *= ps
 
-		local rp = p-pp
-		local rv1 = v1-pp
-		local rv2 = v2-pp
+		local a1 = atan2(v1)
+		local a2 = atan2(v2)
 
-		local pa = atan2(rp)
-		local v1a = atan2(rv1)
-		local v2a = atan2(rv2)
-
-		if(v1a < v2a and pa >= v1a and pa <= v2a) then
-			if pa >= v1a and pa <= v2a then
-				li = i
-				break
+		local fi = false
+		if a1 < a2 then
+			if da >= a1 and da <= a2 then
+				fi = true
 			end
 		else
-			if pa >= v1a or pa <= v2a then
-				li = i
-				break
+			if da >= a1 or da <= a2 then
+				fi = true
 			end
 		end
+
+		if fi then
+			return { v1=v1, v2=v2 }
+		end
 	end
-	
-	local v1 = pvs[li] + pp
-	local v2 =	pvs[li+1] or pvs[1]
-	v2 += pp
-
-	local d = v2-v1
-	local dn = d:normalize()
-	local rp = p-v1
-	local pr = dn:dot(rp)
-
-	local n = dn:perp_ccw()
-	local pd = -n:dot(rp)
-
-	return resp:new(
-		n,
-		pd,
-		v1 + (dn*pr)
-	)
 end

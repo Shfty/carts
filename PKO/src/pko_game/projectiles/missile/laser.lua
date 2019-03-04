@@ -1,3 +1,6 @@
+require("missile")
+require("dot")
+
 --laser
 --reflective projectile
 -------------------------------
@@ -5,10 +8,8 @@ laser=missile:subclass({
 	name="laser"
 })
 
-function laser:init()
-	prim.init(self)
-	dot:new(self)
-	self:trail()
+function laser:graphic()
+	return dot:new(self)
 end
 
 function laser:trail()

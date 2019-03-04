@@ -1,3 +1,5 @@
+require("shape")
+
 --circle
 --circle shape
 -------------------------------
@@ -7,19 +9,19 @@ circle=shape:subclass({
 })
 
 function circle:draw_fill()
-	local pos=self:getpos()
+	local t = self:t()
 	f_circ(
-		pos,
-		self.r,
+		t.t,
+		self.r * t.s.x,
  	self.fc
  )
 end
 
 function circle:draw_stroke()
-	local pos=self:getpos()
+	local t = self:t()
 	s_circ(
-		pos,
-		self.r,
+		t.t,
+		self.r * t.s.x,
  	self.sc
  )
 end

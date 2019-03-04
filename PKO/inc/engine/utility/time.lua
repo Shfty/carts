@@ -1,3 +1,7 @@
+--time
+--wrapper for pico8 time
+--functionality
+-------------------------------
 time={
 	dt=nil
 }

@@ -1,41 +1,37 @@
+require("obj")
+require("trs")
+
 --primitive
 --object with transform
 -------------------------------
 prim=obj:subclass({
 	name="primitive",
-	pos=vec2:new(),			--position
-	apos=false,
-	org=vec2:new(),			--origin
-	a=0														--angle
+	trs=nil											--transform
 })
 
-function prim:getpos()
-	local pos=vec2:new()
-	local c=self
-	while c!=nil do
-		local cp = c.pos
-		local cap = c.apos
-		local co = c.org
+function prim:init()
+	obj.init(self)
+	self.trs = self.trs or trs:new()
+end
 
-		if(cp) pos+=cp
-		if(co) pos+=co
+function prim:t()
+	local t = trs:new()
 
-		if(cap) then
-			break
-		else
-			c=c.parent
+	local c = self
+	while c != nil do
+		local ct = c.trs
+		if(ct) then
+			t = t * ct
+			if(ct.a) return t
 		end
+		c = c.parent
 	end
 
-	return pos
+	return t
 end
 
 function prim:__tostr()
 	return
 		obj.__tostr(self).." - "..
-		self.pos:__tostr()
+		self.trs:__tostr()
 end
-
-require("prim/graphic")
-require("prim/camera")
-require("prim/pointer")

@@ -1,3 +1,6 @@
+require("input")
+require("vec2")
+
 --mouse
 --wrapper for mouse input
 -------------------------------

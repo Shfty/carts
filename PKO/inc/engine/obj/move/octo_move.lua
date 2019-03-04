@@ -1,14 +1,22 @@
+require("move")
+
 --octo_move
 --8-way move
 -------------------------------
 octo_move=move:subclass({
 	name="8-way move",
-	v=vec2:new(),		--velocity
-	mv=60,									--max velocity
+	v=nil,									--velocity
+	mv=80,									--max velocity
 	ac=600,								--acceleration
-	dc=600,								--deceleration
-	wv=vec2:new()		--wish vector
+	dc=400,								--deceleration
+	wv=nil									--wish vector
 })
+
+function octo_move:init()
+	move.init(self)
+	self.v = self.v or vec2:new()
+	self.wv = self.wv or vec2:new()
+end
 
 function octo_move:update()
 	local v = self.v

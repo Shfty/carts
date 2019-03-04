@@ -1,7 +1,18 @@
+require("graphic")
+require("vec2")
+require("trs")
+require("pointer")
+require("box")
+require("text")
+
+require("dbg_ovr")
+require("dbg_log")
+require("dbg_sg")
+
 --debug ui
 dbg_ui=graphic:subclass({
 	name="debug ui",
-	pos=vec2:new(2,2),
+	trs=trs:new(),
 	tabs=nil,
 	at=nil,
 	tw=nil,
@@ -20,13 +31,14 @@ function dbg_ui:init()
 	self.pw=pointer:new(self)
 	
 	local bg=box:new(wrap,{
-		sz=vec2:new(123,8),
+		trs=trs:new(vec2:new(61,5)),
+		sz=vec2:new(61,4),
 		sc=0x1107.0000,
 		fc=0x1100.5a5a
 	})
 	
 	self.tw=text:new(bg,{
-		pos=vec2:new(2,2)
+		trs=trs:new(vec2:new(-58,-2))
 	})
 	
 	local tabs = {}
@@ -41,7 +53,7 @@ end
 
 function dbg_ui:update()
 	graphic.update(self)
-	self.pos=drawstate:campos()+2
+	self.trs.t=drawstate:campos()+2
 
 	local tabs = self.tabs
 	local at = self.at

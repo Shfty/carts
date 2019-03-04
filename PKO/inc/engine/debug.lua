@@ -1,11 +1,12 @@
---debug
---collection of debugging
---functionality
--------------------------------
+require("dbg_ui")
+require("dbg_axis")
+require("dbg_col")
 
-require("debug/dbg_ui")
-require("debug/dbg_panel")
-require("debug/dbg_ovr")
-require("debug/dbg_log")
-require("debug/dbg_sg")
-require("debug/dbg_axis")
+debug={
+	ts_init_s = 0,
+	ts_init_e = 0,
+	ts_update_s = 0,
+	ts_update_e = 0,
+	ts_draw_s = 0,
+	ts_draw_e = 0
+}

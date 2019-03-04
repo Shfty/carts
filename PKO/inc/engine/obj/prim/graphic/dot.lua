@@ -1,3 +1,5 @@
+require("graphic")
+
 --dot
 --pixel graphic
 -------------------------------
@@ -11,7 +13,7 @@ function dot:g_draw()
 	if(not self.v) return
 	
 	d_point(
-		self:getpos(),
+		self:t().t,
  	self.c
  )
 	

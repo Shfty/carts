@@ -1,12 +1,7 @@
+require("dbg_panel")
+
 --debug overlay
 -------------------------------
-ts_init_s = 0
-ts_init_e = 0
-ts_update_s = 0
-ts_update_e = 0
-ts_draw_s = 0
-ts_draw_e = 0
-
 dbg_ovr=dbg_panel:subclass({
 	name="system info",
 	key="1",
@@ -19,7 +14,7 @@ function dbg_ovr:init()
 	dbg_panel.init(self)
 	
 	self.tw=text:new(self,{
-		pos=vec2:new(2,2)
+		trs=trs:new(vec2:new(-58,-54))
 	})
 end
 
@@ -34,10 +29,10 @@ function dbg_ovr:update()
 	local mem=stat(0)
 	
 	--cpu
-	local icpu = ts_init_e-ts_init_s
+	local icpu = debug.ts_init_e-debug.ts_init_s
 	
-	local ucpu = ts_update_e-ts_update_s
-	local dcpu = ts_draw_e-ts_draw_s
+	local ucpu = debug.ts_update_e-debug.ts_update_s
+	local dcpu = debug.ts_draw_e-debug.ts_draw_s
 	local tcpu = ucpu+dcpu
 
 	local fps = time:fps()
