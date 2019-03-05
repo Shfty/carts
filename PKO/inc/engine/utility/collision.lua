@@ -129,7 +129,7 @@ end
 
 --circle intersect circle
 function col:c_isect_c(at,ar,bt,br)
-	return (bt.t-at.t):len() <
+	return (bt.t-at.t):len() <=
 								(max(at.s.x,at.s.y) * ar) +
 								(max(bt.s.x,bt.s.y) * br)
 end
@@ -145,10 +145,10 @@ function col:b_isect_b(at,ae,bt,be)
 	local b1 = bp - sbe
 	local b2 = bp + sbe
 
-	return a1.x < b2.x and
-								a2.x > b1.x and
-								a1.y < b2.y and
-								a2.y > b1.y
+	return a1.x <= b2.x and
+								a2.x >= b1.x and
+								a1.y <= b2.y and
+								a2.y >= b1.y
 end
 
 --poly intersect poly
@@ -197,7 +197,7 @@ function col:py_isect_py(at,avs,bt,bvs)
 		end
 	end
 
-	if(amin < bmax) then
+	if(amin <= bmax) then
 		local fp = fdn:dot(d-fv1)
 
 		local rcp = bp + fv1 + (fdn * fp)

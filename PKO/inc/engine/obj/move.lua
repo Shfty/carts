@@ -7,15 +7,12 @@ require("dbg_axis")
 move=obj:subclass({
 	name="move",
 	dp=nil,
-	geo=nil,
-	da=nil         --debug axis
+	geo=nil
 })
 
 function move:init()
 	obj.init(self)
 	self.dp = self.dp or vec2:new()
-	self.da = dbg_axis:new(self)
-	self.da.trs.a = true
 end
 
 function move:update()
@@ -55,7 +52,5 @@ function move:update()
 end
 
 function move:collision(r)
-	self.parent.trs.t += r.n * (r.pd+0.0001)
-	self.da.trs.t = r.cp
-	self.da.trs.r = atan2(r.n)
+	self.parent.trs.t += r.n * r.pd
 end

@@ -71,7 +71,7 @@ function map_isect(ot,og)
 	local op = ot.t
 	local ocr = og.cr
 	local o1 = mpos2tile(op - ocr)
-	local o2 = mpos2tile(op + ocr)
+	local o2 = mpos2tile(op + ocr -1)
 
 	local crs = {}
 	for y = max(o1.y+1,1),o2.y+1 do

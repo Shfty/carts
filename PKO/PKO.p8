@@ -424,9 +424,9 @@ function convex_hull(s)
 		end
 	end
 
-	for v in all(vs) do
-		if(v.x > 0) v.x += 1
-		if(v.y > 0) v.y += 1
+	for i=#vs,1,-1 do
+	if(vs[i].x > 0) vs[i].x += 1
+	if(vs[i].y > 0) vs[i].y += 1
 	end
 
 	return vs
@@ -829,7 +829,7 @@ end
 
 --circle intersect circle
 function col:c_isect_c(at,ar,bt,br)
-	return (bt.t-at.t):len() <
+	return (bt.t-at.t):len() <=
 								(max(at.s.x,at.s.y) * ar) +
 								(max(bt.s.x,bt.s.y) * br)
 end
@@ -845,10 +845,10 @@ function col:b_isect_b(at,ae,bt,be)
 	local b1 = bp - sbe
 	local b2 = bp + sbe
 
-	return a1.x < b2.x and
-								a2.x > b1.x and
-								a1.y < b2.y and
-								a2.y > b1.y
+	return a1.x <= b2.x and
+								a2.x >= b1.x and
+								a1.y <= b2.y and
+								a2.y >= b1.y
 end
 
 --poly intersect poly
@@ -897,7 +897,7 @@ function col:py_isect_py(at,avs,bt,bvs)
 		end
 	end
 
-	if(amin < bmax) then
+	if(amin <= bmax) then
 		local fp = fdn:dot(d-fv1)
 
 		local rcp = bp + fv1 + (fdn * fp)
@@ -1956,35 +1956,22 @@ function debug_game:init()
 
 	--debug ui
 	if(debug != nil) then
-		local p1 = poly:fromsprite(self.sg,1,{
+		sprite:new(self.sg,{
+			trs=trs:new(
+				vec2:new(32,64)-4,
+				0,
+				vec2:new(1,1)
+			),
+			s=1
+		})
+
+		poly:fromsprite(self.sg,1,{
 			trs=trs:new(
 				vec2:new(32,64),
 				0,
-				vec2:new(3,3)
+				vec2:new(2,2)
 			)
 		})
-
-		local p2 = poly:fromsprite(self.sg,3,{
-			trs=trs:new(
-				vec2:new(96,64),
-				0,
-				vec2:new(4,4)
-			)
-		})
-
-		local cp_axis = dbg_axis:new(self.sg)
-		local pd_axis = dbg_axis:new(self.sg)
-		p1.update = function(self)
-			dot.update(self)
-			
-			local r = col:isect(p1:t(),p1.geo,p2:t(),p2.geo)
-			if r != nil then
-				cp_axis.trs.t = r.cp
-				cp_axis.trs.r = atan2(r.n)
-				pd_axis.trs.t = r.cp+(-r.n*r.pd)
-				pd_axis.trs.r = atan2(r.n)
-			end
-		end
 	end
 end
 
@@ -2104,7 +2091,7 @@ function map_isect(ot,og)
 	local op = ot.t
 	local ocr = og.cr
 	local o1 = mpos2tile(op - ocr)
-	local o2 = mpos2tile(op + ocr)
+	local o2 = mpos2tile(op + ocr -1)
 
 	local crs = {}
 	for y = max(o1.y+1,1),o2.y+1 do
@@ -2254,15 +2241,12 @@ end
 move=obj:subclass({
 	name="move",
 	dp=nil,
-	geo=nil,
-	da=nil         --debug axis
+	geo=nil
 })
 
 function move:init()
 	obj.init(self)
 	self.dp = self.dp or vec2:new()
-	self.da = dbg_axis:new(self)
-	self.da.trs.a = true
 end
 
 function move:update()
@@ -2302,9 +2286,7 @@ function move:update()
 end
 
 function move:collision(r)
-	self.parent.trs.t += r.n * (r.pd+0.0001)
-	self.da.trs.t = r.cp
-	self.da.trs.r = atan2(r.n)
+	self.parent.trs.t += r.n * r.pd
 end
 
 --octo_move
@@ -2713,6 +2695,7 @@ function pko_game:init()
 		--dbg_map_col:new(self.sg)
 	end
 end
+
 
 engine:set_active_scene("pko game")
 __gfx__

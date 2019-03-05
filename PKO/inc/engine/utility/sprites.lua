@@ -105,9 +105,9 @@ function convex_hull(s)
 		end
 	end
 
-	for v in all(vs) do
-		if(v.x > 0) v.x += 1
-		if(v.y > 0) v.y += 1
+	for i=#vs,1,-1 do
+	if(vs[i].x > 0) vs[i].x += 1
+	if(vs[i].y > 0) vs[i].y += 1
 	end
 
 	return vs
