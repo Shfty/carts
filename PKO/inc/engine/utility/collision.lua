@@ -78,13 +78,17 @@ function col:generate_map_geo(min,max)
 	for y = 1,#self.map_geo do
 		for x = 1,#self.map_geo[y] do
 			local sg = self.map_geo[y][x]
-				if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+			if sg.geo != nil and
+						sg.geo == square_geo and
+						sg.t.s == vec2:new(1,1) then
 				for e = y+1,#self.map_geo do
 					local eg = self.map_geo[e][x]
 					if(eg.geo == nil) break
 					if(eg.geo != square_geo) break
 					if(eg.t.s != vec2:new(1,1)) break
-					self.map_geo[e][x] = {ptr=vec2:new(x,y)}
+					self.map_geo[e][x] = {
+						ptr=vec2:new(x,y)
+					}
 					local nx = x - 1
 					local ny = y + ((e-y)-1)/2
 					self.map_geo[y][x].t.t =	vec2:new(
