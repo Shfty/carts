@@ -4,7 +4,7 @@ require("vec2")
 --box
 --rect shape
 -------------------------------
-box=shape:subclass({
+box=shape:extend({
 	name="box",
 	sz=nil						--size
 })
@@ -13,6 +13,13 @@ function box:init()
 	shape.init(self)
 	self.sz = self.sz or
 											vec2:new(4,4)
+end
+
+function box:g_cull(sp)
+	return sp.x <= -self.sz.x or
+								sp.y <= -self.sz.y or
+								sp.x > 127+self.sz.x or
+								sp.y > 127+self.sz.y
 end
 
 function box:draw_fill()

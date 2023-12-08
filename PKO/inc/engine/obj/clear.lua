@@ -3,7 +3,7 @@ require("obj")
 --primitive
 --object with transform
 -------------------------------
-clear=obj:subclass({
+clear=obj:extend({
 	name="clear",
 	c=0	--color
 })

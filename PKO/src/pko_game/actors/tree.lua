@@ -3,7 +3,7 @@ require("actor")
 --tree
 --destructible tree
 -------------------------------
-tree=actor:subclass({
+tree=actor:extend({
 	name="tree",
 	s=3
 })

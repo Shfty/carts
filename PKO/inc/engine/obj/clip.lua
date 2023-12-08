@@ -1,9 +1,10 @@
 require("obj")
+require("ds_clip")
 
 --primitive
 --object with transform
 -------------------------------
-clip=obj:subclass({
+clip=obj:extend({
 	name="clip",
 	r=nil								-- clipping rect
 })
@@ -14,7 +15,7 @@ function clip:init()
 end
 
 function clip:draw()
-	local cclip=drawstate:getclip()
+	local cclip=ds_clip()
 	setclip(self.r)
 	obj.draw(self)
 	setclip(cclip)

@@ -6,20 +6,23 @@ obj_count=0
 obj={
 	name="object",
 	parent=nil,
-	children=nil
+	children=nil,
+	_wants_init=true
 }
 
-function obj:subclass(t)
+function obj:extend(t)
 	self.__index=self
-	return
-		setmetatable(t or {}, self)
+	return setmetatable(
+		t or {},
+		self
+	)
 end
 
 function obj:new(p,t)
-	local o=obj.subclass(self,t)
+	local o = self:extend(t)
 
 	p=p or nil	
-	if(p) p:addchild(o)
+	if(p != nil) p:addchild(o)
 	o:init()
 	
 	return o
@@ -44,6 +47,19 @@ end
 function obj:init()
 	obj_count+=1
 	self.children = {}
+	self._wants_init = false
+end
+
+function obj:update()
+	for c in all(self.children) do
+		c:update()
+	end
+end
+
+function obj:draw()
+	for c in all(self.children) do
+		c:draw()
+	end
 end
 
 function obj:addchild(c)
@@ -67,13 +83,7 @@ function obj:__tostr()
 end
 
 function obj.__concat(lhs, rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
+	return tostr(lhs)..tostr(rhs)
 end
 
 function obj:print(pf)
@@ -87,18 +97,6 @@ function obj:print(pf)
 	end
 	
 	return str
-end
-
-function obj:update()
-	for c in all(self.children) do
-		c:update()
-	end
-end
-
-function obj:draw()
-	for c in all(self.children) do
-		c:draw()
-	end
 end
 
 function obj:detach()

@@ -1,9 +1,10 @@
 require("move")
+require("time")
 
 --proj_move
 --projectile move
 -------------------------------
-proj_move=obj:subclass({
+proj_move=move:extend({
 	name="projectile move",
 	a=0,
 	s=80

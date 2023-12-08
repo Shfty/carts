@@ -1,10 +1,11 @@
 require("prim")
 require("sprite")
+require("sprite_geo")
 
 --actor
 --dynamic primitive
 -------------------------------
-actor=prim:subclass({
+actor=prim:extend({
 	name="actor",
 	s=0,					--sprite
 	h=5,					--health
@@ -19,7 +20,7 @@ function actor:init()
 		trs=trs:new(vec2:new(-4,-4)),
 		s=self.s
 	})
-	self._geo = col.sprite_geo[self.s]
+	self._geo = sprite_geo.geo[self.s]
 end
 
 function actor:damage(d)

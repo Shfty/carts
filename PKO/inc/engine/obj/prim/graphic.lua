@@ -1,26 +1,28 @@
 require("prim")
+require("ds_camera")
 
 --graphic
 --primitive with visual element
 -------------------------------
-graphic=prim:subclass({
+graphic=prim:extend({
 	name="graphic",
-	v=true,							--visible
-	cm=nil,							--collision mask
-	clip=nil,					--clip
-	_cclip=nil				--cached clip
+	v=true,						--visible
+	cm=nil							--collision mask
 })
 
 function graphic:draw()
 	if(not self.v) return
 
-	local cp = drawstate:campos()
-	local d = self:t().t - cp
-	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
-	
+	local cp = ds_camera()
+	local sp = self:t().t - cp
+	if(self:g_cull(sp)) return
+
 	self:g_draw()
-	
  prim.draw(self)
+end
+
+function graphic:g_cull(sp)
+	return false
 end
 
 function graphic:g_draw()

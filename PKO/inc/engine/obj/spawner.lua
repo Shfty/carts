@@ -1,12 +1,13 @@
 require("obj")
-require("map")
+require("trs")
+require("map_find_sprites")
 
 --spawner
 --replaces sprites in the map
 --with their object
 --counterpart
 -------------------------------
-spawner=obj:subclass({
+spawner=obj:extend({
 	name="spawner",
 	objs=nil
 })
@@ -20,7 +21,7 @@ function spawner:init()
 		local ps = map_find_sprites(obj.s)
 		for p in all(ps) do
 			mset(p, 0)
-			col.map_geo[p.y+1][p.x+1]={}
+			map_geo.geo[p.y+1][p.x+1]={}
 
 			obj.o:new(obj.p,{
 				trs = trs:new((p*8)+4)

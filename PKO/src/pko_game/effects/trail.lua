@@ -3,7 +3,7 @@ require("graphic")
 --trail
 --line strip trail effect
 -------------------------------
-trail=graphic:subclass({
+trail=graphic:extend({
 	name="trail",
 	cs={12,13,1}, --colors
 	ld=16,								--line divisions

@@ -1,16 +1,23 @@
 --pko_game
 --game scene
-require("scene")
-require("clear")
-require("obj_map")
-require("spawner")
-require("pko")
-require("tut_sat")
-require("tree")
+require("obj")
+
 require("dot")
 require("circle")
 
-pko_game=scene:new({
+require("clear")
+require("obj_map")
+require("spawner")
+
+require("pko")
+require("tut_sat")
+require("tree")
+
+require("controller")
+
+require("log")
+
+pko_game=obj:extend({
 	name="pko game",
 	bg=nil,
 
@@ -19,44 +26,39 @@ pko_game=scene:new({
 		player=nil,
 		missiles=nil
 	},
-	
-	l_pl=nil,
-	l_ms=nil,
-	
-	pnt_g=nil,
-	test=nil,
-	col_vis=nil
+
+	c_p1=nil
 })
 
 --initialization
 -------------------------------
 function pko_game:init()
-	scene.init(self)
+	obj.init(self)
 
 	--initial scene clear
-	clear:new(self.sg)
+	clear:new(self)
 
 	--background
-	self.bg=obj_map:new(self.sg,{
+	self.bg=obj_map:new(self,{
 		name="background"
 	})
 
 	--layers
 	local la=obj:new(
-		self.sg,{
+		self,{
 			name="layer: actors"
 		}
 	)
 	
 	local lp=obj:new(
-		self.sg,
+		self,
 		{
 			name="layer: player"
 		}
 	)
 	
 	local lm=obj:new(
-		self.sg,
+		self,
 		{
 			name="layer: missiles"
 		}
@@ -68,7 +70,7 @@ function pko_game:init()
 
 	--actors
 	spawner:new(
-		self.sg,{
+		self,{
 		objs={
 			{
 				s=1,
@@ -87,18 +89,4 @@ function pko_game:init()
 			}
 		}
 	})
-
-	--debug ui
-	if(debug != nil) then
-		self.pnt_g=dot:new(engine._dev_ui.pw)
-
-		self.test=circle:new(
-			self.layers.player,{
-			trs=trs:new(vec2:new(32,32)),
-			r=8,
-			geo=geo:new(8)
-		})
-
-		--dbg_map_col:new(self.sg)
-	end
 end

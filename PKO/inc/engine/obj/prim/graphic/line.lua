@@ -3,7 +3,7 @@ require("graphic")
 --stripe
 --line graphic
 -------------------------------
-line=graphic:subclass({
+line=graphic:extend({
 	name="stripe",
 	tp=nil,								--target pos
 	at=true,							--abs target
@@ -14,6 +14,10 @@ function line:init()
 	graphic.init(self)
 	self.tp = self.tp or
 											vec2:new(8,0)
+end
+
+function line:g_cull(sp)
+	return false
 end
 
 function line:g_draw()

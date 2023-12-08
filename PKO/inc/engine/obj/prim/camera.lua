@@ -3,7 +3,7 @@ require("prim")
 --cam
 --primitive to control camera
 -------------------------------
-camera=prim:subclass({
+camera=prim:extend({
 	name="camera",
 	min=nil,
 	max=nil

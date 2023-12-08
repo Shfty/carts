@@ -1,135 +1,76 @@
-require("p8_redefs")
-require("logging")
-require("obj")
-
-require("time")
-require("collision")
-
-require("controller")
-require("keyboard")
-require("mouse")
-
 --engine
 --collection of engine
 --functionality
 -------------------------------
 engine={
-	_sg=obj:new(nil,{
-		name="root"
-	}),
-	_sg_wrap=nil,
-	_dev_ui=nil,
-	_scenes={},
-	_active_scene=nil
+	modules={},
+	upd_root=nil,
+	draw_root=nil
 }
 
-engine._sg_wrap = obj:new(
-	engine._sg,
-	{
-		name="scene wrapper"
-	}
-)
-
-function engine:set_active_scene(am)
-	for m in all(self._scenes) do
-		if(m.name == am) then
-			if self._active_scene != nil then
-				self._active_scene.sg:detach()
-			end
-			self._active_scene = m
-			if self._active_scene != nil then
-				self._sg_wrap:addchild(m.sg)
-			end
-			break
-		end
-	end
+function engine:add_module(m)
+	add(self.modules, m)
 end
 
-function engine:get_active_scene()
-	return self._active_scene
+function engine:remove_module(m)
+	del(self.modules, m)
 end
 
 --initialization
 -------------------------------
 function _init()
 	cls()
-	print "ko engine"
-	print "-------------------"
+	print ""
+	print " ko engine"
+	print " -------------------"
+	print " initializing..."
 
-	print "initializing..."
-	if not engine._active_scene then
-		print "error: no scene loaded"
-		return
+	for m in all(engine.modules) do
+		if(m.pre_init != nil) m:pre_init()
 	end
 
-	
-	if(debug != nil) then
-		debug.ts_init_b=time:cpu_t()
-		print "debug ui..."
-		engine._dev_ui=dbg_ui:new(nil)
+	if engine.upd_root then
+		engine.upd_root:init()
 	end
 
-	--enable color literals
-	print "color literals..."
-	poke(0x5f34,1)
-
-	--initialize engine
-	print "collision..."
-	col:init()
-
-	--initialize scenes
-	print "scenes..."
-	for m in all(engine._scenes) do
-		m:init()
-	end
-	
-	if(debug != nil) then
-		engine._sg:addchild(engine._dev_ui)
-		debug.ts_init_e=time:cpu_t()
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_init != nil) m:post_init()
 	end
 end
 
 --main loop
 -------------------------------
 function _update60()
-	if(not engine._active_scene) return
-	
-	time:update()
-
-	local dm = debug != nil
-	if(dm) then
-		debug.ts_update_s=time:cpu_t()
+	for m in all(engine.modules) do
+		if(m.pre_update != nil) m:pre_update()
 	end
 
-	--update input
-	controller:update()
-	if(dm) then
-		kb:update()
-		mouse:update()
+	if engine.upd_root then
+		engine.upd_root:update()
 	end
 
-	--update scenegraph
-	engine._sg:update()
-
-	if(dm) then
-		debug.ts_update_e=time:cpu_t()
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_update != nil) m:post_update()
 	end
 end
 
 --render loop
 -------------------------------
 function _draw()
-	if(not engine._active_scene) return
-
-	local dm = debug != nil
-	if(dm) then
-		debug.ts_draw_s=time:cpu_t()
+	for m in all(engine.modules) do
+		if(m.pre_draw != nil) m:pre_draw()
 	end
 
-	-- draw scenegraph
-	engine._sg:draw()
-	
-	if(dm) then
-		debug.ts_draw_e=time:cpu_t()
+	local d_r = engine.draw_root or
+													engine.upd_root
+	if d_r then
+		d_r:draw()
+	end
+
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_draw != nil) m:post_draw()
 	end
 end

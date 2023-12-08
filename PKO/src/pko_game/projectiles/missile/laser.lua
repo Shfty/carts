@@ -4,7 +4,7 @@ require("dot")
 --laser
 --reflective projectile
 -------------------------------
-laser=missile:subclass({
+laser=missile:extend({
 	name="laser"
 })
 

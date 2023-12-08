@@ -1,9 +1,53 @@
 pico-8 cartridge // http://www.pico-8.com
 version 16
 __lua__
---p8_redefs
---redefinitions of pico-8
---built-ins
+--pico8
+--wrappers for pico-8 built-ins
+--------------------------------
+
+-- conversion
+_old_tostr = tostr
+function tostr(s)
+	if(not s) return "nil"
+	if(type(s) == "string") return s
+	if(type(s) == "number") return _old_tostr(s)
+	if(type(s) == "boolean") return _old_tostr(s)
+	
+	if(s.__tostr) then
+		return s:__tostr()
+	else
+		return _old_tostr(s)
+	end
+end
+
+-- drawstate
+_old_clip = clip
+clip=nil
+function setclip(r)
+	return _old_clip(
+		r.min.x,
+		r.min.y,
+		r.max.x,
+		r.max.y
+	)
+end
+
+_old_camera = camera
+camera=nil
+function setcam(p)
+	return _old_camera(p.x,p.y)
+end
+
+-- graphics
+_old_pset = pset
+pset=nil
+function d_point(p,c)
+	return _old_pset(
+		p.x,
+		p.y,
+		c
+	)
+end
 
 _old_line = line
 line=nil
@@ -58,45 +102,15 @@ function f_rect(a,b,c)
 		c)
 end
 
-_old_clip = clip
-clip=nil
-function setclip(r)
-	return _old_clip(
-		r.min.x,
-		r.min.y,
-		r.max.x,
-		r.max.y
-	)
-end
-
-_old_camera = camera
-camera=nil
-function setcam(p)
-	return _old_camera(p.x,p.y)
-end
-
-_old_pset = pset
-pset=nil
-function d_point(p,c)
-	return _old_pset(
+_old_spr = spr
+function spr(s,p,sz)
+	return _old_spr(
+		s,
 		p.x,
 		p.y,
-		c
+		sz.x,
+		sz.y
 	)
-end
-
-_old_tostr = tostr
-function tostr(s)
-	if(not s) return "nil"
-	if(type(s) == "string") return s
-	if(type(s) == "number") return _old_tostr(s)
-	if(type(s) == "boolean") return _old_tostr(s)
-	
-	if(s.__tostr) then
-		return s:__tostr()
-	else
-		return _old_tostr(s)
-	end
 end
 
 _old_print = print
@@ -114,6 +128,13 @@ function print(s,p,c)
 	)
 end
 
+-- sprites
+_old_sget = sget
+function sget(pos)
+	return _old_sget(pos.x,pos.y)
+end
+
+-- map
 _old_mget = mget
 function mget(p)
 	return _old_mget(p.x, p.y)
@@ -124,48 +145,86 @@ function mset(p,c)
 	return _old_mset(p.x, p.y,c)
 end
 
+-- math
 _old_atan2 = atan2
 function atan2(v)
 	return _old_atan2(v.y,v.x)
 end
-
-_old_sget = sget
-function sget(pos)
-	return _old_sget(pos.x,pos.y)
-end
-
-_old_spr = spr
-function spr(s,p,sz)
-	return _old_spr(
-		s,
-		p.x,
-		p.y,
-		sz.x,
-		sz.y
-	)
-end--logging
---log functionality and
---wrappers for built-in
---string and print handling
+--engine
+--collection of engine
+--functionality
 -------------------------------
-log_buf = {}
-log_count = 1
-log_limit = 1000
-function log(s)
-	local str = log_count..">"
-	str = str..tostr(s)
-	add(log_buf,str)
-	if(#log_buf>log_limit) then
-		del(log_buf,log_buf[1])
-	end
-	log_count += 1
+engine={
+	modules={},
+	upd_root=nil,
+	draw_root=nil
+}
+
+function engine:add_module(m)
+	add(self.modules, m)
 end
 
-function getcursor()
-	cr = vec2:new()
-	cr.x = peek(0x5f26)
-	cr.y = peek(0x5f27)
-	return cr
+function engine:remove_module(m)
+	del(self.modules, m)
+end
+
+--initialization
+-------------------------------
+function _init()
+	cls()
+	print ""
+	print " ko engine"
+	print " -------------------"
+	print " initializing..."
+
+	for m in all(engine.modules) do
+		if(m.pre_init != nil) m:pre_init()
+	end
+
+	if engine.upd_root then
+		engine.upd_root:init()
+	end
+
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_init != nil) m:post_init()
+	end
+end
+
+--main loop
+-------------------------------
+function _update60()
+	for m in all(engine.modules) do
+		if(m.pre_update != nil) m:pre_update()
+	end
+
+	if engine.upd_root then
+		engine.upd_root:update()
+	end
+
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_update != nil) m:post_update()
+	end
+end
+
+--render loop
+-------------------------------
+function _draw()
+	for m in all(engine.modules) do
+		if(m.pre_draw != nil) m:pre_draw()
+	end
+
+	local d_r = engine.draw_root or
+													engine.upd_root
+	if d_r then
+		d_r:draw()
+	end
+
+	for i = #engine.modules,1,-1 do
+		local m = engine.modules[i]
+		if(m.post_draw != nil) m:post_draw()
+	end
 end
 --object
 --basic scene graph unit
@@ -175,20 +234,23 @@ obj_count=0
 obj={
 	name="object",
 	parent=nil,
-	children=nil
+	children=nil,
+	_wants_init=true
 }
 
-function obj:subclass(t)
+function obj:extend(t)
 	self.__index=self
-	return
-		setmetatable(t or {}, self)
+	return setmetatable(
+		t or {},
+		self
+	)
 end
 
 function obj:new(p,t)
-	local o=obj.subclass(self,t)
+	local o = self:extend(t)
 
 	p=p or nil	
-	if(p) p:addchild(o)
+	if(p != nil) p:addchild(o)
 	o:init()
 	
 	return o
@@ -213,6 +275,19 @@ end
 function obj:init()
 	obj_count+=1
 	self.children = {}
+	self._wants_init = false
+end
+
+function obj:update()
+	for c in all(self.children) do
+		c:update()
+	end
+end
+
+function obj:draw()
+	for c in all(self.children) do
+		c:draw()
+	end
 end
 
 function obj:addchild(c)
@@ -236,13 +311,7 @@ function obj:__tostr()
 end
 
 function obj.__concat(lhs, rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
+	return tostr(lhs)..tostr(rhs)
 end
 
 function obj:print(pf)
@@ -256,18 +325,6 @@ function obj:print(pf)
 	end
 	
 	return str
-end
-
-function obj:update()
-	for c in all(self.children) do
-		c:update()
-	end
-end
-
-function obj:draw()
-	for c in all(self.children) do
-		c:draw()
-	end
 end
 
 function obj:detach()
@@ -287,149 +344,6 @@ function obj:destroy()
 	end
 	
 	obj_count-=1
-end
---time
---wrapper for pico8 time
---functionality
--------------------------------
-time={
-	dt=nil
-}
-
-function time:update()
-	if self.dt == nil then
-		self.dt=1/self:fpstarget()
-	end
-end
-
-function time:cpu_t()
-	return stat(1)
-end
-
-function time:syscpu_t()
-	return stat(2)
-end
-
-function time:fps()
-	return stat(7)
-end
-
-function time:fpstarget()
-	return stat(8)
-end
---sprites
---wrapper for pico8 sprite
---functionality
--------------------------------
---sprite pos > sprite index
---@spos vec2 sprite pixel coords
---@return number sprite index
-function spos2idx(spos)
-	local dp = spos/8
-	return stile2idx(
-		vec2:new(
-			flr(dp.x),
-			flr(dp.y)
-		)
-	)
-end
-
---sprite tile > sprite index
---@spos vec2 sprite tile coords
---@return number sprite index
-function stile2idx(stile)
-	return (stile.y*16)+stile.x
-end
-
---sprite index > sprite tile
---@sidx vec2 map tile coords
---@return number sprite tile coords
-function sidx2tile(sidx)
-	return vec2:new(
-		sidx%16, 
-		flr(sidx/16)
-	)
-end
-
---sprite index > sprite pos
---@sidx number sprite index
---@return number sprite pixel coords
-function sidx2pos(sidx)
-	return sidx2tile(sidx)*8
-end
-
---walks along a sprite
---line by line in the specified
---direction and returns the
---first non-0 pixel's coords
-function trace_edge(s,xs,ys,f)
-	f = f or false
-
-	local xb,xe,yb,ye=0,7,0,7
-
-	if(xs<0) xb,xe=7,0
-	if(ys<0) yb,ye=7,0
-	
-	local sp = sidx2pos(s)
-
-	if(not f) then
-		for x=xb,xe,xs do
-			for y=yb,ye,ys do
-				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
-					return vec2:new(x,y)
-				end
-			end
-		end
-	else
-		for y=yb,ye,ys do
-			for x=xb,xe,xs do
-				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
-					return vec2:new(x,y)
-				end
-			end
-		end
-	end
-end
-
---traces the edges of the
---given sprite in clockwise
---order to generate a
---simplified collision mesh
-function convex_hull(s)
-	local vs = {}
-
-	local sp = sidx2pos(s)
-
-	add(vs,trace_edge(s,1,1,true)-4)
-	add(vs,trace_edge(s,-1,1,true)-4)
-
-	add(vs,trace_edge(s,-1,1)-4)
-	add(vs,trace_edge(s,-1,-1)-4)
-
-	add(vs,trace_edge(s,-1,-1,true)-4)
-	add(vs,trace_edge(s,1,-1,true)-4)
-
-	add(vs,trace_edge(s,1,-1)-4)
-	add(vs,trace_edge(s,1,1)-4)
-
-	for i=#vs,1,-1 do
-		if(not vs[i]) del(vs,vs[i])
-	end
-
-	for i=#vs,1,-1 do
-		local v1 = vs[i]
-		local v2 = vs[i-1] or vs[#vs]
-		if(v1 == v2) then
-			del(vs,v1)
-		end
-	end
-
-	for i=#vs,1,-1 do
-	if(vs[i].x > 0) vs[i].x += 1
-	if(vs[i].y > 0) vs[i].y += 1
-	end
-
-	return vs
 end
 --vec2
 --two dimensional vector
@@ -621,18 +535,937 @@ function vec2:lerp(tgt,d)
 end
 
 function vec2:__tostr()
-	return "x:"..self.x..
+	return "vec2 x:"..self.x..
 	",y:"..self.y
 end
 
 function vec2.__concat(lhs,rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
+	return tostr(lhs)..tostr(rhs)
+end
+
+--trs
+--transform
+-------------------------------
+trs={
+	t=nil,		--translate
+	r=0,				--rotate
+	s=nil,			--scale
+	a=false		--absolute
+}
+
+function trs:new(t,r,s,a)
+	local t = t or vec2:new()
+	local r = r or 0
+	local s = s or vec2:new(1,1)
+	local a = a or false
+	
+	self.__index=self
+	return setmetatable({
+		t = t,
+		r = r or 0,
+		s = s,
+		a = a
+	}, self)
+end
+
+function trs:is_a(t)
+	return t == trs
+end
+
+function trs:__mul(rhs)
+	return trs:new(
+		self.t+rhs.t,
+		self.r+rhs.r,
+		self.s*rhs.s
+	)
+end
+
+function trs:__tostr()
+	return "trs t:"..self.t..
+								",r:"..self.r..
+								",s:"..self.s
+end
+
+function trs.__concat(lhs,rhs)
+	return tostr(lhs)..tostr(rhs)
+end
+
+--primitive
+--object with transform
+-------------------------------
+prim=obj:extend({
+	name="primitive",
+	trs=nil											--transform
+})
+
+function prim:init()
+	obj.init(self)
+	self.trs = self.trs or trs:new()
+end
+
+function prim:t()
+	local t = trs:new()
+
+	local c = self
+	while c != nil do
+		local ct = c.trs
+		if(ct) then
+			t = t * ct
+			if(ct.a) return t
+		end
+		c = c.parent
 	end
 
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
+	return t
+end
+
+function prim:__tostr()
+	return
+		obj.__tostr(self).." - "..
+		self.trs:__tostr()
+end
+
+function ds_camera()
+	return vec2:new(
+		peek4(0x5f26),
+		peek4(0x5f28)
+	)
+end
+
+--graphic
+--primitive with visual element
+-------------------------------
+graphic=prim:extend({
+	name="graphic",
+	v=true,						--visible
+	cm=nil							--collision mask
+})
+
+function graphic:draw()
+	if(not self.v) return
+
+	local cp = ds_camera()
+	local sp = self:t().t - cp
+	if(self:g_cull(sp)) return
+
+	self:g_draw()
+ prim.draw(self)
+end
+
+function graphic:g_cull(sp)
+	return false
+end
+
+function graphic:g_draw()
+end
+
+function graphic:col_mask(m)
+	m = m or 255
+	return band(self.cm,m) > 0
+end
+
+--shape
+--graphic with
+--stroke/fill colors
+-------------------------------
+shape=graphic:extend({
+	name="shape",
+	s=true,							--stroke
+	sc=6,									--stroke color
+	f=true,							--fill
+	fc=7,									--fill color
+	cm=255								--collision mask
+})
+
+function shape:g_draw()
+	if(not self.v) return
+	
+	if(self.f) self:draw_fill()
+	if(self.s) self:draw_stroke()
+	
+	graphic.g_draw(self)
+end
+
+function shape:draw_stroke()
+end
+
+function shape:draw_fill()
+end
+
+--box
+--rect shape
+-------------------------------
+box=shape:extend({
+	name="box",
+	sz=nil						--size
+})
+
+function box:init()
+	shape.init(self)
+	self.sz = self.sz or
+											vec2:new(4,4)
+end
+
+function box:g_cull(sp)
+	return sp.x <= -self.sz.x or
+								sp.y <= -self.sz.y or
+								sp.x > 127+self.sz.x or
+								sp.y > 127+self.sz.y
+end
+
+function box:draw_fill()
+	local t = self:t()
+	local p = t.t
+	local sz = self.sz * t.s
+	f_rect(
+		p-sz,
+		p+sz,
+ 	self.fc
+ )
+end
+
+function box:draw_stroke()
+	local t = self:t()
+	local p = t.t
+	local sz = self.sz * t.s
+	s_rect(
+		p-sz,
+		p+sz,
+ 	self.sc
+ )
+end
+
+--text
+--text graphic
+-------------------------------
+text=graphic:extend({
+	name="text",
+	str=""
+})
+
+function text:g_cull(sp)
+	return false
+end
+
+function text:g_draw()
+	if(not self.v) return
+	
+	print(
+		self.str,
+		self:t().t
+	)
+	
+	graphic.g_draw(self)
+end
+--enable devkit input
+poke(0x5f2d,1)
+
+--keyboard
+--wrapper for keyboard input
+-------------------------------
+kb = {
+	name="keyboard",
+	kp=nil
+}
+
+function kb:pre_update()
+	self.kp = {}
+	while stat(30) do
+		add(self.kp, stat(31))
 	end
+end
+
+function kb:keyp(char)
+	for k in all(self.kp) do
+		if(k == char) return true
+	end
+	return false
+end
+
+engine:add_module(kb)
+	--enable color literals
+	poke(0x5f34,1)
+
+--debug panel
+-------------------------------
+dbg_panel=graphic:extend({
+	name="debug panel",
+	sz=nil,
+	sy=0,
+	key=nil,
+	v=false
+})
+
+function dbg_panel:init()
+	self.trs = self.trs or
+												trs:new(
+													vec2:new(61,66)
+												)
+
+	graphic.init(self)
+
+	self.sz = self.sz or
+												vec2:new(61,56)
+
+	box:new(self,{
+		sz=self.sz,
+		sc=0x1107.0000,
+		fc=0x1100.5a5a
+	})
+end
+
+function dbg_panel:update()
+	if(not self.v) return
+
+	local sy = self.sy
+	
+	if(kb:keyp("-")) sy -= 114
+	if(kb:keyp("=")) sy += 114
+	if(kb:keyp("[")) sy -= 6
+	if(kb:keyp("]")) sy += 6
+	
+	self.sy = max(sy,0)
+	
+	graphic.update(self)
+end
+
+function dbg_panel:__tostr()
+	local w = self.w
+
+	return
+		prim.__tostr(self).." "..
+		"w:"..flr(w)..","..
+		"w:"..flr(w)
+end
+function t_fps()
+	return stat(7)
+end
+function t_fpstarget()
+	return stat(8)
+end
+
+--debug overlay
+-------------------------------
+dbg_ovr=dbg_panel:extend({
+	name="system info",
+	key="1",
+	mw=nil,		--memory widget
+	cw=nil,		--cpu widget
+	ow=nil			--object widget
+})
+
+function dbg_ovr:init()
+	dbg_panel.init(self)
+	
+	self.tw=text:new(self,{
+		trs=trs:new(vec2:new(-58,-54))
+	})
+end
+
+function dbg_ovr:update()
+	dbg_panel.update(self)
+	
+	if(not self.v) return
+	
+	local str = ""
+	
+	--memory
+	local mem=stat(0)
+	
+	--cpu
+	local icpu = debug.ts_init_e-debug.ts_init_s
+	
+	local ucpu = debug.ts_update_e-debug.ts_update_s
+	local dcpu = debug.ts_draw_e-debug.ts_draw_s
+	local tcpu = ucpu+dcpu
+
+	local fps = t_fps()
+	local tfps = t_fpstarget()
+	
+	str=str..
+		"    memory: "..mem.." kib\n"..
+		"\n"..
+		"   init cpu: "..(icpu*100).." %\n"..
+		"\n"..
+		" update cpu: "..(ucpu*100).." %\n"..
+		"   draw cpu: "..(dcpu*100).." %\n"..
+		"  total cpu: "..(tcpu*100).." %\n"..
+		"\n"..
+		"       fps: "..fps.."\n"..
+		"target fps: "..tfps.."\n"..
+		"\n"..
+		" obj_count: "..obj_count
+		
+	self.tw.str=str
+end
+--log
+--log functionality and
+--wrappers for built-in
+--string and print handling
+-------------------------------
+_log_buf = {}
+_log_count = 1
+_log_limit = 1000
+
+function log(s)
+	local str = _log_count..">"
+	str = str..tostr(s)
+	add(_log_buf,str)
+	if(#_log_buf>_log_limit) then
+		del(_log_buf,_log_buf[1])
+	end
+	_log_count += 1
+end
+
+--rect
+--rectangle
+-------------------------------
+rect={
+	min=vec2:new(),
+	max=vec2:new()
+}
+
+function rect:new(x1,y1,x2,y2)
+	x1 = x1 or 0
+	y1 = y1 or 0
+	x2 = x2 or 1
+	y2 = y2 or 1
+	
+	self.__index=self
+	return setmetatable({
+		min=vec2:new(x1,y1),
+		max=vec2:new(x2,y2)
+	}, self)
+end
+
+function rect:is_a(t)
+	return t == rect
+end
+
+function rect:__tostr()
+	return "rect min:"..self.min..
+	",max:"..self.max
+end
+
+function rect.__concat(lhs,rhs)
+	return tostr(lhs)..tostr(rhs)
+end
+
+function ds_clip()
+	local x1 = peek(0x5f20)
+	local y1 = peek(0x5f21)
+	return rect:new(
+		x1,
+		y1,
+		peek(0x5f22)-x1,
+		peek(0x5f23)-y1
+	)
+end
+
+--primitive
+--object with transform
+-------------------------------
+clip=obj:extend({
+	name="clip",
+	r=nil								-- clipping rect
+})
+
+function clip:init()
+	obj.init(self)
+	self.r = self.r or rect:new()
+end
+
+function clip:draw()
+	local cclip=ds_clip()
+	setclip(self.r)
+	obj.draw(self)
+	setclip(cclip)
+end
+
+function clip:__tostr()
+	return obj.__tostr(self).." - r:"..self.r
+end
+
+--debug log
+-------------------------------
+dbg_log=dbg_panel:extend({
+	name="log",
+	key="2",
+	cw=nil,
+	tw=nil
+})
+
+function dbg_log:init()
+	dbg_panel.init(self)
+
+	local cw=clip:new(self,{
+		r=rect:new(2,10,124,116)
+	})
+	self.cw = cw
+	
+	self.tw=text:new(cw,{
+		trs=trs:new(vec2:new(-58,-54))
+	})
+end
+
+function dbg_log:update()
+	dbg_panel.update(self)
+	
+	if(not self.v) return
+	
+	local str=""
+	for s in all(_log_buf) do
+		str = str..s.."\n"
+	end
+	
+	local tw = self.tw
+	tw.trs.t.y=-54-self.sy
+	tw.str=str
+end
+
+--debug scenegraph
+-------------------------------
+dbg_sg=dbg_panel:extend({
+	name="scenegraph",
+	key="3",
+	cw=nil,
+	tw=nil,
+	root_cb=nil
+})
+
+function dbg_sg:init()
+	dbg_panel.init(self)
+
+	self.cw=clip:new(self,{
+		r=rect:new(2,12,122,112)
+	})
+	
+	self.tw=text:new(self.cw,{
+		trs=trs:new(vec2:new(-58,-54))
+	})
+end
+
+function dbg_sg:update()
+	dbg_panel.update(self)
+	
+	if(not self.v) return
+	if(not self.root_cb) return
+
+	local tw = self.tw
+	tw.trs.t.y=-54-self.sy
+	tw.str=self.root_cb():print()
+end
+
+
+--debug ui
+dbg_ui=graphic:extend({
+	name="debug ui",
+	trs=trs:new(),
+	tabs=nil,
+	at=nil,
+	tw=nil,
+	wrap=nil
+})
+
+function dbg_ui:init()
+	graphic.init(self)
+	
+	local wrap=graphic:new(self,{
+		name="wrap"
+	})
+	self.wrap = wrap
+	
+	local bg=box:new(wrap,{
+		trs=trs:new(vec2:new(61,5)),
+		sz=vec2:new(61,4),
+		sc=0x1107.0000,
+		fc=0x1100.5a5a
+	})
+	
+	self.tw=text:new(bg,{
+		trs=trs:new(vec2:new(-58,-2))
+	})
+	
+	local tabs = {}
+	tabs["1"]=
+		dbg_ovr:new(wrap)
+	tabs["2"]=
+		dbg_log:new(wrap)
+	tabs["3"]=
+		dbg_sg:new(wrap,{
+			name="update graph",
+			root_cb=function()
+				return engine.upd_root
+			end
+		})
+	tabs["4"]=
+		dbg_sg:new(wrap,{
+			name="draw graph",
+			root_cb=function()
+				return engine.draw_root or
+											engine.upd_root
+			end
+		})
+	self.tabs=tabs
+end
+
+function dbg_ui:update()
+	graphic.update(self)
+	self.trs.t=ds_camera()+2
+
+	local tabs = self.tabs
+	local at = self.at
+	
+	for k,tab in pairs(tabs) do
+ 	if(kb:keyp(k)) then
+ 		if(at!=k) then
+				at=k
+				self.tw.str=tab.name
+			else
+				at=nil
+			end
+ 	end
+	end
+	
+	for k,tab in pairs(tabs) do
+		tab.v=k==at
+	end
+	
+	self.at = at
+	self.wrap.v = at != nil
+end
+function t_cpu()
+	return stat(1)
+end
+
+debug={
+	name = "debug",
+	ts_init_s = 0,
+	ts_init_e = 0,
+	ts_update_s = 0,
+	ts_update_e = 0,
+	ts_draw_s = 0,
+	ts_draw_e = 0,
+	ui=nil
+}
+
+function debug:pre_init()
+	self.ts_init_s = t_cpu()
+	self.ui = dbg_ui:new(nil)
+end
+
+function debug:post_init()
+	self.ts_init_e = t_cpu()
+end
+
+function debug:pre_update()
+	self.ts_update_s = t_cpu()
+end
+
+function debug:post_update()
+	self.ui:update()
+	self.ts_update_e = t_cpu()
+end
+
+function debug:pre_draw()
+	self.ts_draw_s = t_cpu()
+end
+
+function debug:post_draw()
+	self.ui:draw()
+	self.ts_draw_e = t_cpu()
+end
+
+engine:add_module(debug)
+
+--dot
+--pixel graphic
+-------------------------------
+dot=graphic:extend({
+	name="dot",
+	c=7,								--color
+	cm=255						--collision mask
+})
+
+function dot:g_cull(sp)
+	return sp.x < 0 or
+								sp.y < 0 or
+								sp.x > 127 or
+								sp.y > 127
+end
+
+function dot:g_draw()
+	if(not self.v) return
+	
+	d_point(
+		self:t().t,
+ 	self.c
+ )
+	
+	graphic.g_draw(self)
+end
+
+--circle
+--circle shape
+-------------------------------
+circle=shape:extend({
+	name="circle",
+	r=1,								   --radius
+})
+
+function circle:g_cull(sp)
+	return sp.x <= -self.r or
+								sp.y <= -self.r or
+								sp.x > 127+self.r or
+								sp.y > 127+self.r
+end
+
+function circle:draw_fill()
+	local t = self:t()
+	f_circ(
+		t.t,
+		self.r * max(t.s.x,t.s.y),
+ 	self.fc
+ )
+end
+
+function circle:draw_stroke()
+	local t = self:t()
+	s_circ(
+		t.t,
+		self.r * max(t.s.x,t.s.y),
+ 	self.sc
+ )
+end
+
+--primitive
+--object with transform
+-------------------------------
+clear=obj:extend({
+	name="clear",
+	c=0	--color
+})
+
+function clear:draw()
+	cls(self.c)
+	obj.draw(self)
+end
+
+function clear:__tostr()
+	return obj.__tostr(self).." - c:"..self.c
+end
+
+--map
+--map graphic
+-------------------------------
+obj_map=prim:extend({
+	name="map",
+	mtile=nil,
+	sz=nil
+})
+
+function obj_map:init()
+	prim.init(self)
+	self.mtile = self.mtile or
+														vec2:new()
+	self.sz = self.sz or
+											vec2:new(16,16)
+end
+
+function obj_map:update()
+	local cp = ds_camera()
+	local ts = cp % 8
+	self.trs.t = cp - ts
+	local mt = self.trs.t/8
+	self.mtile.x = flr(mt.x)
+	self.mtile.y = flr(mt.y)
+	prim.update(self)
+end
+
+function obj_map:draw()
+	local mt = self.mtile
+	local pos = self:t().t
+	local sz = self.sz
+	
+	map(
+		mt.x-1,
+		mt.y-1,
+		pos.x-8,
+		pos.y-8,
+		sz.x+2,
+		sz.y+2
+	)
+	
+	prim.draw(self)
+end
+function map_find_sprites(s,tm)
+	tm = tm or vec2:new(255,127)
+
+	local coords = {}
+	for y=0,tm.y-1 do
+		for x=0,tm.x-1 do
+			local p = vec2:new(x,y)
+			local ms = mget(p)
+			if(ms == s) then
+				add(coords,p)
+			end
+		end
+	end
+
+	return coords
+end
+
+--spawner
+--replaces sprites in the map
+--with their object
+--counterpart
+-------------------------------
+spawner=obj:extend({
+	name="spawner",
+	objs=nil
+})
+
+function spawner:init()
+	prim.init(self)
+
+	self.objs = self.objs or {}
+
+	for obj in all(self.objs) do
+		local ps = map_find_sprites(obj.s)
+		for p in all(ps) do
+			mset(p, 0)
+			map_geo.geo[p.y+1][p.x+1]={}
+
+			obj.o:new(obj.p,{
+				trs = trs:new((p*8)+4)
+			})
+		end
+	end
+end
+
+--sprite
+--sprite graphic
+-------------------------------
+sprite=graphic:extend({
+	name="sprite",
+	sz=nil,								--size
+	s=0												--sprite
+})
+
+function sprite:init()
+	self.sz = self.sz or
+											vec2:new(1,1)
+end
+
+function sprite:g_cull(sp)
+	local ps = self.sz * 8
+	return sp.x <= -ps.x or
+								sp.y <= -ps.y or
+								sp.x > 127 or
+								sp.y > 127
+end
+
+	function sprite:g_draw()
+	if(not self.v) return
+	
+	spr(
+		self.s,
+		self:t().t,
+		self.sz
+	)
+	
+	graphic.g_draw(self)
+end
+
+--sprite index > sprite tile
+--@sidx vec2 map tile coords
+--@return number sprite tile coords
+function sidx2tile(sidx)
+	return vec2:new(
+		sidx%16, 
+		flr(sidx/16)
+	)
+end
+
+--sprite index > sprite pos
+--@sidx number sprite index
+--@return number sprite pixel coords
+function sidx2pos(sidx)
+	return sidx2tile(sidx)*8
+end
+
+--walks along a sprite
+--line by line in the specified
+--direction and returns the
+--first non-0 pixel's coords
+function trace_edge(s,xs,ys,f)
+	f = f or false
+
+	local xb,xe,yb,ye=0,7,0,7
+
+	if(xs<0) xb,xe=7,0
+	if(ys<0) yb,ye=7,0
+	
+	local sp = sidx2pos(s)
+
+	if(not f) then
+		for x=xb,xe,xs do
+			for y=yb,ye,ys do
+				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
+					return vec2:new(x,y)
+				end
+			end
+		end
+	else
+		for y=yb,ye,ys do
+			for x=xb,xe,xs do
+				if(sget(vec2:new(sp.x+x,sp.y+y)) > 0) then
+					return vec2:new(x,y)
+				end
+			end
+		end
+	end
+end
+
+--traces the edges of the
+--given sprite in clockwise
+--order to generate a
+--simplified collision mesh
+function convex_hull(s)
+	local vs = {}
+
+	local sp = sidx2pos(s)
+
+	add(vs,trace_edge(s,1,1,true)-4)
+	add(vs,trace_edge(s,-1,1,true)-4)
+
+	add(vs,trace_edge(s,-1,1)-4)
+	add(vs,trace_edge(s,-1,-1)-4)
+
+	add(vs,trace_edge(s,-1,-1,true)-4)
+	add(vs,trace_edge(s,1,-1,true)-4)
+
+	add(vs,trace_edge(s,1,-1)-4)
+	add(vs,trace_edge(s,1,1)-4)
+
+	for i=#vs,1,-1 do
+		if(not vs[i]) del(vs,vs[i])
+	end
+
+	for i=#vs,1,-1 do
+		local v1 = vs[i]
+		local v2 = vs[i-1] or vs[#vs]
+		if(v1 == v2) then
+			del(vs,v1)
+		end
+	end
+
+	for i=#vs,1,-1 do
+	if(vs[i].x > 0) vs[i].x += 1
+	if(vs[i].y > 0) vs[i].y += 1
+	end
+
+	return vs
 end
 
 geo={
@@ -702,12 +1535,180 @@ function geo:__eq(rhs)
 	return true
 end
 
+sprite_geo={
+	name="sprite geo",
+	numspr = 128,
+	geo = {}
+}
+
+function sprite_geo:pre_init()
+	local numspr = self.numspr or 128
+
+	for i=0,numspr-1 do
+		if(fget(i)>0) then
+		 local vs = convex_hull(i)
+			self.geo[i] = geo:new(vs)
+		end
+	end
+end
+
+engine:add_module(sprite_geo)
+
+--actor
+--dynamic primitive
+-------------------------------
+actor=prim:extend({
+	name="actor",
+	s=0,					--sprite
+	h=5,					--health
+	_sc=nil,	--sprite component
+	_geo=nil,	--geometry
+})
+
+function actor:init()
+	prim.init(self)
+
+	self._sc=sprite:new(self,{
+		trs=trs:new(vec2:new(-4,-4)),
+		s=self.s
+	})
+	self._geo = sprite_geo.geo[self.s]
+end
+
+function actor:damage(d)
+	self.h -= d
+	if self.h <= 0 then
+		self.die()
+	end
+end
+
+function actor:die()
+	self.destroy()
+end
+--map pos > map tile
+--@pos vec2 map pixel coords
+--@return vec2 map tile coords
+function mpos2tile(pos)
+	return vec2:new(
+		flr(pos.x/8),
+		flr(pos.y/8)
+	)
+end
+
 --collision
 --wrapper for collision
 --functionality
 -------------------------------
+map_geo={
+	name="map geo",
+	min=nil,
+	max=nil,
+	geo={}
+}
+
+function map_geo:pre_init()
+	local min = self.min or vec2:new(0,0)
+	local max = self.max or vec2:new(63,31)
+
+	-- create geo for each map tile
+	for y = min.y,max.y do
+		self.geo[y+1] = {}
+		for x = min.x,max.x do
+			self.geo[y+1][x+1] = {}
+			local p = vec2:new(x,y)
+			local s = mget(p)
+			if s > 0 then
+				self.geo[y+1][x+1] = {
+					t=trs:new((p*8)+4),
+					geo=sprite_geo.geo[s]
+				}
+			end
+		end
+	end
+
+	local square_geo = geo:new({
+		vec2:new(4,-4),
+		vec2:new(4,4),
+		vec2:new(-4,4),
+		vec2:new(-4,-4),
+	})
+		
+	-- merge vertical lines of square tiles
+	for y = 1,#self.geo do
+		for x = 1,#self.geo[y] do
+			local sg = self.geo[y][x]
+			if sg.geo != nil and
+						sg.geo == square_geo and
+						sg.t.s == vec2:new(1,1) then
+				for e = y+1,#self.geo do
+					local eg = self.geo[e][x]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					if(eg.t.s != vec2:new(1,1)) break
+					self.geo[e][x] = {
+						ptr=vec2:new(x,y)
+					}
+					local nx = x - 1
+					local ny = y + ((e-y)-1)/2
+					self.geo[y][x].t.t =	vec2:new(
+						(nx*8)+4,
+						(ny*8)
+					)
+					self.geo[y][x].t.s.y = (e-y)+1
+				end
+			end
+		end
+	end
+
+	-- merge horizontal lines of square tiles
+	for y = 1,#self.geo do
+		for x = 1,#self.geo[y] do
+			local sg = self.geo[y][x]
+			if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
+				for e = x+1,#self.geo[y] do
+					local eg = self.geo[y][e]
+					if(eg.geo == nil) break
+					if(eg.geo != square_geo) break
+					self.geo[y][e] = {ptr=vec2:new(x,y)}
+					local nx = x + ((e-x)-1)/2
+					local ny = (y-1)
+					self.geo[y][x].t.t =	vec2:new(
+						(nx*8),
+						(ny*8)+4
+					)
+					self.geo[y][x].t.s.x = (e-x)+1
+				end
+			end
+		end
+	end
+end
+
+engine:add_module(map_geo)
+--circle intersect circle
+function c_isect_c(at,ar,bt,br)
+	return (bt.t-at.t):len() <=
+								(max(at.s.x,at.s.y) * ar) +
+								(max(bt.s.x,bt.s.y) * br)
+end
+function b_isect_b(at,ae,bt,be)
+	local ap = at.t
+	local bp = bt.t
+	local sae = ae * at.s
+	local sbe = be * bt.s
+
+	local a1 = ap - sae
+	local a2 = ap + sae
+	local b1 = bp - sbe
+	local b2 = bp + sbe
+
+	return a1.x <= b2.x and
+								a2.x >= b1.x and
+								a1.y <= b2.y and
+								a2.y >= b1.y
+end
+
 resp={
-	n=vec2:new(), --normal
+	n=vec2:new(), --normal#
 	pd=0,         --penetrate dist
 	cp=vec2:new() --contact point
 }
@@ -726,137 +1727,41 @@ function resp:flip()
 	self.cp += self.n*self.pd
 end
 
-col={
-	sprite_geo={},
-	map_geo={}
-}
+function py_get_face(p,pt,pvs)
+	local pp = pt.t
+	local ps = pt.s
 
-function col:init(numspr)
-	numspr = numspr or 128
+	local d = p - pp
+	local dn = d:normalize()
+	local da = atan2(dn)
 
-	print("generating sprite collision...")
-	for i=0,numspr-1 do
-		if(fget(i)>0) then
-		 local vs = convex_hull(i)
-			self.sprite_geo[i] =
-				geo:new(vs)
-		end
-	end
+	for i=1,#pvs do
+		local v1 = pvs[i]*ps
+		local v2 = pvs[i+1] or pvs[1]
+		v2 *= ps
 
-	print("generating map collision...")
-	self:generate_map_geo()
-end
+		local a1 = atan2(v1)
+		local a2 = atan2(v2)
 
-function col:generate_map_geo(min,max)
-	min = min or vec2:new(0,0)
-	max = max or vec2:new(63,31)
-	
-	-- create geo for each map tile
-	for y = min.y,max.y do
-		self.map_geo[y+1] = {}
-		for x = min.x,max.x do
-			self.map_geo[y+1][x+1] = {}
-			local p = vec2:new(x,y)
-			local s = mget(p)
-			if s > 0 then
-				self.map_geo[y+1][x+1] = {
-					t=trs:new((p*8)+4),
-					geo=self.sprite_geo[s]
-				}
+		local fi = false
+		if a1 < a2 then
+			if da >= a1 and da <= a2 then
+				fi = true
+			end
+		else
+			if da >= a1 or da <= a2 then
+				fi = true
 			end
 		end
-	end
 
-	local square_geo = geo:new({
-		vec2:new(4,-4),
-		vec2:new(4,4),
-		vec2:new(-4,4),
-		vec2:new(-4,-4),
-	})
-		
-	-- merge vertical lines of square tiles
-	for y = 1,#self.map_geo do
-		for x = 1,#self.map_geo[y] do
-			local sg = self.map_geo[y][x]
-			if sg.geo != nil and
-						sg.geo == square_geo and
-						sg.t.s == vec2:new(1,1) then
-				for e = y+1,#self.map_geo do
-					local eg = self.map_geo[e][x]
-					if(eg.geo == nil) break
-					if(eg.geo != square_geo) break
-					if(eg.t.s != vec2:new(1,1)) break
-					self.map_geo[e][x] = {
-						ptr=vec2:new(x,y)
-					}
-					local nx = x - 1
-					local ny = y + ((e-y)-1)/2
-					self.map_geo[y][x].t.t =	vec2:new(
-						(nx*8)+4,
-						(ny*8)
-					)
-					self.map_geo[y][x].t.s.y = (e-y)+1
-				end
-			end
+		if fi then
+			return { v1=v1, v2=v2 }
 		end
 	end
-
-	-- merge horizontal lines of square tiles
-	for y = 1,#self.map_geo do
-		for x = 1,#self.map_geo[y] do
-			local sg = self.map_geo[y][x]
-			if sg.geo != nil and sg.geo == square_geo and sg.t.s == vec2:new(1,1) then
-				for e = x+1,#self.map_geo[y] do
-					local eg = self.map_geo[y][e]
-					if(eg.geo == nil) break
-					if(eg.geo != square_geo) break
-					self.map_geo[y][e] = {ptr=vec2:new(x,y)}
-					local nx = x + ((e-x)-1)/2
-					local ny = (y-1)
-					self.map_geo[y][x].t.t =	vec2:new(
-						(nx*8),
-						(ny*8)+4
-					)
-					self.map_geo[y][x].t.s.x = (e-x)+1
-				end
-			end
-		end
-	end
-end
-
---unified collision test
-function col:isect(at,ag,bt,bg)
-	if(not self:c_isect_c(at,ag.cr,bt,bg.cr)) return nil
-	if(not self:b_isect_b(at,ag.be,bt,bg.be)) return nil
-	return self:py_isect_py(at,ag.vs,bt,bg.vs)
-end
-
---circle intersect circle
-function col:c_isect_c(at,ar,bt,br)
-	return (bt.t-at.t):len() <=
-								(max(at.s.x,at.s.y) * ar) +
-								(max(bt.s.x,bt.s.y) * br)
-end
-
-function col:b_isect_b(at,ae,bt,be)
-	local ap = at.t
-	local bp = bt.t
-	local sae = ae * at.s
-	local sbe = be * bt.s
-
-	local a1 = ap - sae
-	local a2 = ap + sae
-	local b1 = bp - sbe
-	local b2 = bp + sbe
-
-	return a1.x <= b2.x and
-								a2.x >= b1.x and
-								a1.y <= b2.y and
-								a2.y >= b1.y
 end
 
 --poly intersect poly
-function col:py_isect_py(at,avs,bt,bvs)
+function py_isect_py(at,avs,bt,bvs)
 	local ap = at.t
 	local as = at.s
 	local bp = bt.t
@@ -864,7 +1769,7 @@ function col:py_isect_py(at,avs,bt,bvs)
 	local d = ap - bp
 	local dn = d:normalize()
 
-	local f = self:py_get_face(ap,bt,bvs)
+	local f = py_get_face(ap,bt,bvs)
 	local fv1 = f.v1
 	local fv2 = f.v2
 	local fd = fv2 - fv1
@@ -924,795 +1829,42 @@ function col:py_isect_py(at,avs,bt,bvs)
 	end
 end
 
-function col:py_get_face(p,pt,pvs)
-	local pp = pt.t
-	local ps = pt.s
+--unified collision test
+function isect(at,ag,bt,bg)
+	if(not c_isect_c(at,ag.cr,bt,bg.cr)) return nil
+	if(not b_isect_b(at,ag.be,bt,bg.be)) return nil
+	return py_isect_py(at,ag.vs,bt,bg.vs)
+end
 
-	local d = p - pp
-	local dn = d:normalize()
-	local da = atan2(dn)
+function map_isect(ot,og)
+	local op = ot.t
+	local ocr = og.cr
+	local o1 = mpos2tile(op - ocr)
+	local o2 = mpos2tile(op + ocr -1)
 
-	for i=1,#pvs do
-		local v1 = pvs[i]*ps
-		local v2 = pvs[i+1] or pvs[1]
-		v2 *= ps
-
-		local a1 = atan2(v1)
-		local a2 = atan2(v2)
-
-		local fi = false
-		if a1 < a2 then
-			if da >= a1 and da <= a2 then
-				fi = true
-			end
-		else
-			if da >= a1 or da <= a2 then
-				fi = true
+	local crs = {}
+	for y = max(o1.y+1,1),o2.y+1 do
+		for x = max(o1.x+1,1),o2.x+1 do
+			local mg = map_geo.geo[y][x]
+			if(mg.ptr) mg = map_geo.geo[mg.ptr.y][mg.ptr.x]
+			if(mg.geo != nil) then
+				local r = isect(
+					ot,
+					og,
+					mg.t,
+					mg.geo
+				)
+				if(r) add(crs,r)
 			end
 		end
-
-		if fi then
-			return { v1=v1, v2=v2 }
-		end
-	end
-end
---input
---collection of input wrappers
--------------------------------
---enable devkit input
-poke(0x5f2d,1)
-
---controller
---wrapper for pico8 gamepad
--------------------------------
-controller = {
-	p=0,							--player index
-	dpad=vec2:new(),
-
-	a=false,			--a button
-	_la=false,	--last a button
-	ap=false,		--a pressed
-	
-	b=false,			--b button
-	_lb=false,	--last b button
-	bp=false			--b pressed
-}
-
-function controller:new(p)
-	self.__index=self
-	return setmetatable({
-		p=p or 0
-	}, self)
-end
-
-function controller:update()
-	local wx = 0
-	if(btn(0,self.p)) wx -= 1
-	if(btn(1,self.p)) wx += 1
-
-	local wy = 0
-	if(btn(2,self.p)) wy -= 1
-	if(btn(3,self.p)) wy += 1
-
-	self.dpad = vec2:new(wx,wy)
-
-	self._la = self.a
-	self.a=btn(4,self.p)
-	self.ap=self.a and not self._la
-
-	self._lb = self.b
-	self.b=btn(5,self.p)
-	self.bp=self.b and not self._lb
-end
-
---controller
---wrapper for keyboard input
--------------------------------
-kb = {
-	kp=nil,
-	kc=nil
-}
-
-function kb:update()
-	self.kp=stat(30)
-	self.kc=stat(31)
-end
-
-function kb:keyp(char)
-	return self.kp and self.kc == char
-end
-
---mouse
---wrapper for mouse input
--------------------------------
-mouse = {
-	mp=vec2:new(),
-	mb=0
-}
-
-function mouse:update()
-	self.mp=vec2:new(stat(32),stat(33))
-	self.mb=stat(34)
-end
-
-
-
---engine
---collection of engine
---functionality
--------------------------------
-engine={
-	_sg=obj:new(nil,{
-		name="root"
-	}),
-	_sg_wrap=nil,
-	_dev_ui=nil,
-	_scenes={},
-	_active_scene=nil
-}
-
-engine._sg_wrap = obj:new(
-	engine._sg,
-	{
-		name="scene wrapper"
-	}
-)
-
-function engine:set_active_scene(am)
-	for m in all(self._scenes) do
-		if(m.name == am) then
-			if self._active_scene != nil then
-				self._active_scene.sg:detach()
-			end
-			self._active_scene = m
-			if self._active_scene != nil then
-				self._sg_wrap:addchild(m.sg)
-			end
-			break
-		end
-	end
-end
-
-function engine:get_active_scene()
-	return self._active_scene
-end
-
---initialization
--------------------------------
-function _init()
-	cls()
-	print "ko engine"
-	print "-------------------"
-
-	print "initializing..."
-	if not engine._active_scene then
-		print "error: no scene loaded"
-		return
 	end
 
-	
-	if(debug != nil) then
-		debug.ts_init_b=time:cpu_t()
-		print "debug ui..."
-		engine._dev_ui=dbg_ui:new(nil)
-	end
-
-	--enable color literals
-	print "color literals..."
-	poke(0x5f34,1)
-
-	--initialize engine
-	print "collision..."
-	col:init()
-
-	--initialize scenes
-	print "scenes..."
-	for m in all(engine._scenes) do
-		m:init()
-	end
-	
-	if(debug != nil) then
-		engine._sg:addchild(engine._dev_ui)
-		debug.ts_init_e=time:cpu_t()
-	end
+	return crs
 end
 
---main loop
--------------------------------
-function _update60()
-	if(not engine._active_scene) return
-	
-	time:update()
-
-	local dm = debug != nil
-	if(dm) then
-		debug.ts_update_s=time:cpu_t()
-	end
-
-	--update input
-	controller:update()
-	if(dm) then
-		kb:update()
-		mouse:update()
-	end
-
-	--update scenegraph
-	engine._sg:update()
-
-	if(dm) then
-		debug.ts_update_e=time:cpu_t()
-	end
-end
-
---render loop
--------------------------------
-function _draw()
-	if(not engine._active_scene) return
-
-	local dm = debug != nil
-	if(dm) then
-		debug.ts_draw_s=time:cpu_t()
-	end
-
-	-- draw scenegraph
-	engine._sg:draw()
-	
-	if(dm) then
-		debug.ts_draw_e=time:cpu_t()
-	end
-end
-
---trs
---transform
--------------------------------
-trs={
-	t=nil,		--translate
-	r=0,				--rotate
-	s=nil,			--scale
-	a=false		--absolute
-}
-
-function trs:new(t,r,s,a)
-	local t = t or vec2:new()
-	local r = r or 0
-	local s = s or vec2:new(1,1)
-	local a = a or false
-	
-	self.__index=self
-	return setmetatable({
-		t = t,
-		r = r or 0,
-		s = s,
-		a = a
-	}, self)
-end
-
-function trs:is_a(t)
-	return t == trs
-end
-
-function trs:__mul(rhs)
-	return trs:new(
-		self.t+rhs.t,
-		self.r+rhs.r,
-		self.s*rhs.s
-	)
-end
-
-function trs:__tostr()
-	return "trs t:"..self.t..
-								",r:"..self.r..
-								",s:"..self.s
-end
-
-function trs.__concat(lhs,rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
-end
-
---primitive
---object with transform
--------------------------------
-prim=obj:subclass({
-	name="primitive",
-	trs=nil											--transform
-})
-
-function prim:init()
-	obj.init(self)
-	self.trs = self.trs or trs:new()
-end
-
-function prim:t()
-	local t = trs:new()
-
-	local c = self
-	while c != nil do
-		local ct = c.trs
-		if(ct) then
-			t = t * ct
-			if(ct.a) return t
-		end
-		c = c.parent
-	end
-
-	return t
-end
-
-function prim:__tostr()
-	return
-		obj.__tostr(self).." - "..
-		self.trs:__tostr()
-end
-
---graphic
---primitive with visual element
--------------------------------
-graphic=prim:subclass({
-	name="graphic",
-	v=true,							--visible
-	cm=nil,							--collision mask
-	clip=nil,					--clip
-	_cclip=nil				--cached clip
-})
-
-function graphic:draw()
-	if(not self.v) return
-
-	local cp = drawstate:campos()
-	local d = self:t().t - cp
-	--if(d.x<0 or d.y<0 or d.x>127 or d.y>127) return
-	
-	self:g_draw()
-	
- prim.draw(self)
-end
-
-function graphic:g_draw()
-end
-
-function graphic:col_mask(m)
-	m = m or 255
-	return band(self.cm,m) > 0
-end
---drawstate
---wrapper for pico8
---internal draw state
--------------------------------
-drawstate={}
-
-function drawstate:campos()
-	return vec2:new(
-		peek4(0x5f26),
-		peek4(0x5f28)
-	)
-end
-
-function drawstate:getclip()
-	local x1 = peek(0x5f20)
-	local y1 = peek(0x5f21)
-	return rect:new(
-		x1,
-		y1,
-		peek(0x5f22)-x1,
-		peek(0x5f23)-y1
-	)
-end
-
---pointer
---mouse pointer
--------------------------------
-pointer=prim:subclass({
-	name="pointer"
-})
-
-function pointer:init()
-	prim.init(self)
-	self.trs.a = true
-end
-
-function pointer:update()
-	prim.update(self)
-	self.trs.t = drawstate:campos() + mouse.mp
-end
-
---shape
---graphic with
---stroke/fill colors
--------------------------------
-shape=graphic:subclass({
-	name="shape",
-	s=true,
-	sc=6,
-	f=true,
-	fc=7,
-	cm=255
-})
-
-function shape:g_draw()
-	if(not self.v) return
-	
-	if(self.f) self:draw_fill()
-	if(self.s) self:draw_stroke()
-	
-	graphic.g_draw(self)
-end
-
-function shape:draw_stroke()
-end
-
-function shape:draw_fill()
-end
-
---box
---rect shape
--------------------------------
-box=shape:subclass({
-	name="box",
-	sz=nil						--size
-})
-
-function box:init()
-	shape.init(self)
-	self.sz = self.sz or
-											vec2:new(4,4)
-end
-
-function box:draw_fill()
-	local t = self:t()
-	local p = t.t
-	local sz = self.sz * t.s
-	f_rect(
-		p-sz,
-		p+sz,
- 	self.fc
- )
-end
-
-function box:draw_stroke()
-	local t = self:t()
-	local p = t.t
-	local sz = self.sz * t.s
-	s_rect(
-		p-sz,
-		p+sz,
- 	self.sc
- )
-end
-
---text
---text graphic
--------------------------------
-text=graphic:subclass({
-	name="text",
-	str=""
-})
-
-function text:g_draw()
-	if(not self.v) return
-	
-	print(
-		self.str,
-		self:t().t
-	)
-	
-	graphic.g_draw(self)
-end
---debug panel
--------------------------------
-dbg_panel=graphic:subclass({
-	name="debug panel",
-	sz=nil,
-	sy=0,
-	key=nil,
-	v=false
-})
-
-function dbg_panel:init()
-	self.trs = self.trs or
-												trs:new(
-													vec2:new(61,66)
-												)
-
-	graphic.init(self)
-
-	self.sz = self.sz or
-												vec2:new(61,56)
-
-	box:new(self,{
-		sz=self.sz,
-		sc=0x1107.0000,
-		fc=0x1100.5a5a
-	})
-end
-
-function dbg_panel:update()
-	if(not self.v) return
-
-	local sy = self.sy
-	
-	if(kb:keyp("-")) sy -= 114
-	if(kb:keyp("=")) sy += 114
-	if(kb:keyp("[")) sy -= 6
-	if(kb:keyp("]")) sy += 6
-	
-	self.sy = max(sy,0)
-	
-	graphic.update(self)
-end
-
-function dbg_panel:__tostr()
-	local w = self.w
-
-	return
-		prim.__tostr(self).." "..
-		"w:"..flr(w)..","..
-		"w:"..flr(w)
-end
-
---debug overlay
--------------------------------
-dbg_ovr=dbg_panel:subclass({
-	name="system info",
-	key="1",
-	mw=nil,		--memory widget
-	cw=nil,		--cpu widget
-	ow=nil			--object widget
-})
-
-function dbg_ovr:init()
-	dbg_panel.init(self)
-	
-	self.tw=text:new(self,{
-		trs=trs:new(vec2:new(-58,-54))
-	})
-end
-
-function dbg_ovr:update()
-	dbg_panel.update(self)
-	
-	if(not self.v) return
-	
-	local str = ""
-	
-	--memory
-	local mem=stat(0)
-	
-	--cpu
-	local icpu = debug.ts_init_e-debug.ts_init_s
-	
-	local ucpu = debug.ts_update_e-debug.ts_update_s
-	local dcpu = debug.ts_draw_e-debug.ts_draw_s
-	local tcpu = ucpu+dcpu
-
-	local fps = time:fps()
-	local tfps = time:fpstarget()
-	
-	str=str..
-		"    memory: "..mem.." kib\n"..
-		"\n"..
-		"   init cpu: "..(icpu*100).." %\n"..
-		"\n"..
-		" update cpu: "..(ucpu*100).." %\n"..
-		"   draw cpu: "..(dcpu*100).." %\n"..
-		"  total cpu: "..(tcpu*100).." %\n"..
-		"\n"..
-		"target fps: "..tfps.."\n"..
-		"       fps: "..fps.."\n"..
-		"\n"..
-		" obj_count: "..obj_count
-		
-	self.tw.str=str
-end
-
---primitive
---object with transform
--------------------------------
-clip=obj:subclass({
-	name="clip",
-	r=nil								-- clipping rect
-})
-
-function clip:init()
-	obj.init(self)
-	self.r = self.r or rect:new()
-end
-
-function clip:draw()
-	local cclip=drawstate:getclip()
-	setclip(self.r)
-	obj.draw(self)
-	setclip(cclip)
-end
-
-function clip:__tostr()
-	return obj.__tostr(self).." - r:"..self.r
-end
-
---rect
---rectangle
--------------------------------
-rect={
-	min=vec2:new(),
-	max=vec2:new()
-}
-
-function rect:new(x1,y1,x2,y2)
-	x1 = x1 or 0
-	y1 = y1 or 0
-	x2 = x2 or 1
-	y2 = y2 or 1
-	
-	self.__index=self
-	return setmetatable({
-		min=vec2:new(x1,y1),
-		max=vec2:new(x2,y2)
-	}, self)
-end
-
-function rect:is_a(t)
-	return t == rect
-end
-
-function rect:__tostr()
-	return "min:"..self.min..
-	",max:"..self.max
-end
-
-function rect.__concat(lhs,rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
-end
-
-
---debug log
--------------------------------
-dbg_log=dbg_panel:subclass({
-	name="log",
-	key="2",
-	cw=nil,
-	tw=nil
-})
-
-function dbg_log:init()
-	dbg_panel.init(self)
-
-	local cw=clip:new(self,{
-		r=rect:new(2,10,124,116)
-	})
-	self.cw = cw
-	
-	self.tw=text:new(cw,{
-		trs=trs:new(vec2:new(-58,-54))
-	})
-end
-
-function dbg_log:update()
-	dbg_panel.update(self)
-	
-	if(not self.v) return
-	
-	local str=""
-	for s in all(log_buf) do
-		str = str..s.."\n"
-	end
-	
-	local tw = self.tw
-	tw.trs.t.y=-54-self.sy
-	tw.str=str
-end
---debug scenegraph
--------------------------------
-dbg_sg=dbg_panel:subclass({
-	name="scenegraph",
-	key="3",
-	cw=nil,
-	tw=nil
-})
-
-function dbg_sg:init()
-	dbg_panel.init(self)
-
-	self.cw=clip:new(self,{
-		r=rect:new(2,12,122,112)
-	})
-	
-	self.tw=text:new(self.cw,{
-		trs=trs:new(vec2:new(-58,-54))
-	})
-end
-
-function dbg_sg:update()
-	dbg_panel.update(self)
-	
-	if(not self.v) return
-
-	local tw = self.tw
-	tw.trs.t.y=-54-self.sy
-	tw.str=engine:get_active_scene().sg:print()
-end
-
-
---debug ui
-dbg_ui=graphic:subclass({
-	name="debug ui",
-	trs=trs:new(),
-	tabs=nil,
-	at=nil,
-	tw=nil,
-	pw=nil,
-	wrap=nil
-})
-
-function dbg_ui:init()
-	graphic.init(self)
-	
-	local wrap=graphic:new(self,{
-		name="wrap"
-	})
-	self.wrap = wrap
-	
-	local bg=box:new(wrap,{
-		trs=trs:new(vec2:new(61,5)),
-		sz=vec2:new(61,4),
-		sc=0x1107.0000,
-		fc=0x1100.5a5a
-	})
-	
-	self.tw=text:new(bg,{
-		trs=trs:new(vec2:new(-58,-2))
-	})
-	
-	local tabs = {}
-	tabs["1"]=
-		dbg_ovr:new(wrap)
-	tabs["2"]=
-		dbg_log:new(wrap)
-	tabs["3"]=
-		dbg_sg:new(wrap)
-	self.tabs=tabs
-
-	self.pw=pointer:new(self.wrap)
-end
-
-function dbg_ui:update()
-	graphic.update(self)
-	self.trs.t=drawstate:campos()+2
-
-	local tabs = self.tabs
-	local at = self.at
-	
-	for k,tab in pairs(tabs) do
- 	if(kb:keyp(k)) then
- 		if(at!=k) then
-				at=k
-				self.tw.str=tab.name
-			else
-				at=nil
-			end
- 	end
-	end
-	
-	for k,tab in pairs(tabs) do
-		tab.v=k==at
-	end
-	
-	self.at = at
-	self.wrap.v = at != nil
-end
 --debug coordinate axis
 -------------------------------
-dbg_axis=graphic:subclass({
+dbg_axis=graphic:extend({
 	name="debug axis",
 	axis=nil,
 	sz=5,
@@ -1743,506 +1895,11 @@ function dbg_axis:g_draw()
 		8
 	)
 end
-dbg_spr_col=obj:subclass({
-	name="debug map collision"
-})
-
-function dbg_spr_col:init()
-	obj.init(self)
-	
-	for k,geo in pairs(col.sprite_geo) do
-		circle:new(self,{
-			trs=trs:new(
-				vec2:new(
-					4+(k%16)*10,
-					4+flr(k/16)*10
-				)
-			),
-			r=geo.cr,
-			sc=9,
-			f=false
-		})
-		box:new(self,{
-			trs=trs:new(
-				vec2:new(
-					4+(k%16)*10,
-					4+flr(k/16)*10
-				)
-			),
-			sz=geo.be,
-			sc=11,
-			f=false
-		})
-		poly:fromsprite(self,k,{
-			trs=trs:new(
-				vec2:new(
-					4+(k%16)*10,
-					4+flr(k/16)*10
-				)
-			),
-		})
-	end
-end
-
---poly
---n-sided shape
--------------------------------
-poly=shape:subclass({
-	name="poly",
-	vs=nil							--vertices
-})
-
-function poly:init()
-	shape.init(self)
-	self.vs = self.vs or {}
-end
-
-function poly:fromsprite(p,s,t)
-	t = t or {}
-	t.geo=col.sprite_geo[s]
-	assert(t.geo)
-	t.cm=fget(s)
-	return poly:new(p,t)
-end
-
-function poly:draw_stroke()
-	local p = self:t().t
-	local s = self:t().s
-	local vs = self.geo.vs
-
-	for i=1,#vs do
-		local v1 = vs[i]:copy()
-		local v2 = (vs[i+1] or vs[1]):copy()
-
-		if(v1.x > 0) v1.x -= 1
-		if(v1.y > 0) v1.y -= 1
-		if(v2.x > 0) v2.x -= 1
-		if(v2.y > 0) v2.y -= 1
-
-		v1 *= s
-		v1 += p
-
-		v2 *= s
-		v2 += p
-
-		d_line(v1,v2,self.sc)
-	end
-
-	for i=1,#vs do
-		local v1 = vs[i]:copy()
-
-		if(v1.x > 0) v1.x -= 1
-		if(v1.y > 0) v1.y -= 1
-
-		v1 *= s
-		v1 += p
-
-		d_point(v1,8)
-	end
-end
-
-dbg_map_col=obj:subclass({
-	name="debug map collision"
-})
-
-function dbg_map_col:init()
-	obj.init(self)
-	
-	for y in all(col.map_geo) do
-		for x in all(y) do
-			if x.geo != nil then
-				poly:new(self,{
-					trs=x.t,
-					geo=x.geo
-				})
-				
-				circle:new(self,{
-					trs=x.t,
-					r=x.geo.cr,
-					sc=9,
-					f=false
-				})
-
-				box:new(self,{
-					trs=x.t,
-					sz=x.geo.be,
-					sc=11,
-					f=false
-				})
-			end
-		end
-	end
-end
-
-debug={
-	ts_init_s = 0,
-	ts_init_e = 0,
-	ts_update_s = 0,
-	ts_update_e = 0,
-	ts_draw_s = 0,
-	ts_draw_e = 0
-}
-scene={
-	name="scene",
-	sg=nil
-}
-
-function scene:new(t)
-	self.__index=self
-	local o = setmetatable(
-		t or {},
-		self
-	)
-	o.sg = obj:new(nil)
-	add(engine._scenes, o)
-	return o
-end
-
-function scene:init()
-	self.sg.name = self.name
-end
-
---primitive
---object with transform
--------------------------------
-clear=obj:subclass({
-	name="clear",
-	c=0	--color
-})
-
-function clear:draw()
-	cls(self.c)
-	obj.draw(self)
-end
-
-function clear:__tostr()
-	return obj.__tostr(self).." - c:"..self.c
-end
-
---dot
---pixel graphic
--------------------------------
-dot=graphic:subclass({
-	name="dot",
-	c=7,								--color
-	cm=255						--collision mask
-})
-
-function dot:g_draw()
-	if(not self.v) return
-	
-	d_point(
-		self:t().t,
- 	self.c
- )
-	
-	graphic.g_draw(self)
-end
---debug game
---debugging scene
-
-debug_game=scene:new({
-	name="debug game",
-	cp_axis=nil,
-	pd_axis=nil
-})
-
---initialization
--------------------------------
-function debug_game:init()
-	scene.init(self)
-
-	--initial scene clear
-	clear:new(self.sg)
-	camera:new(self.sg,{
-		trs=trs:new(vec2:new(64,64))
-	})
-
-	--debug ui
-	if(debug != nil) then
-		sprite:new(self.sg,{
-			trs=trs:new(
-				vec2:new(32,64)-4,
-				0,
-				vec2:new(1,1)
-			),
-			s=1
-		})
-
-		poly:fromsprite(self.sg,1,{
-			trs=trs:new(
-				vec2:new(32,64),
-				0,
-				vec2:new(2,2)
-			)
-		})
-	end
-end
-
---map
---map graphic
--------------------------------
-obj_map=graphic:subclass({
-	name="map",
-	mtile=nil,
-	sz=nil
-})
-
-function obj_map:init()
-	graphic.init(self)
-	self.mtile = self.mtile or
-														vec2:new()
-	self.sz = self.sz or
-											vec2:new(16,16)
-end
-
-function obj_map:update()
-	local cp = drawstate:campos()
-	local ts = cp % 8
-	self.trs.t = cp - ts
-	local mt = self.trs.t/8
-	self.mtile.x = flr(mt.x)
-	self.mtile.y = flr(mt.y)
-	graphic.update(self)
-end
-
-function obj_map:g_draw()
-	if(not self.v) return
-	
-	local pos=self:t().t
-	
-	map(
-		self.mtile.x-1,
-		self.mtile.y-1,
-		pos.x-8,
-		pos.y-8,
-		self.sz.x+2,
-		self.sz.y+2
-	)
-	
-	graphic.g_draw(self)
-end
---map
---wrapper for pico8 map
---functionality
--------------------------------
---map pos > map tile
---@pos vec2 map pixel coords
---@return vec2 map tile coords
-function mpos2tile(pos)
-	return vec2:new(
-		flr(pos.x/8),
-		flr(pos.y/8)
-	)
-end
-
---map tile > map pos
---@mtile vec2 map tile coords
---@return vec2 map pixel coords
-function mtile2pos(mtile)
-	return mtile*8
-end
-
-function map_sprite_at(p,max)
-	max=max or vec2:new(255,127)
-
-	if(p.x < 0 or
-				p.y < 0) then
-		return -1
-	end
-
-	local mp = mpos2tile(p)
-
-	if(mp.x > max.x or
-				mp.y > max.y) then
-		return -1
-	end
-
-	--fetch sprite from map
-	return mget(mp)
-end
-
-function map_sprites_in(p1,p2,max)
-	max=max or vec2:new(255,127)
-
-	local mp1 = mpos2tile(p1)
-	local mp2 = mpos2tile(p2)
-
-	ss={}
-
-	for x=mp1.x,mp2.x do
-		for y=mp1.y,mp2.y do
-			local s = mget(vec2:new(x,y))
-			if(s>0) then
-				local st = {
-					trs=trs:new(
-						vec2:new(
-							(x*8)+4,
-							(y*8)+4
-						)
-					),
-					s=s
-				}
-				add(ss,st)
-			end
-		end
-	end
-
-	return ss
-end
-
-function map_isect(ot,og)
-	local op = ot.t
-	local ocr = og.cr
-	local o1 = mpos2tile(op - ocr)
-	local o2 = mpos2tile(op + ocr -1)
-
-	local crs = {}
-	for y = max(o1.y+1,1),o2.y+1 do
-		for x = max(o1.x+1,1),o2.x+1 do
-			local mg = col.map_geo[y][x]
-			if(mg.ptr) mg = col.map_geo[mg.ptr.y][mg.ptr.x]
-			if(mg.geo != nil) then
-				local r = col:isect(
-					ot,
-					og,
-					mg.t,
-					mg.geo
-				)
-				if(r) add(crs,r)
-			end
-		end
-	end
-
-	return crs
-end
-
-function map_contains(p,m)
-	m = m or 255
-	
-	local s = map_sprite_at(p)
-
-	if(s>0) then
-		local sp = sidx2pos(s)
-		local cm = fget(s)
-
-		if(band(m,cm) == 0) then
-			return false
-		end
-
-		return sget(sp+(p%8))>0
-	end
-
-	return false
-end
-
-function map_find_sprites(s,tm)
-	tm = tm or vec2:new(255,127)
-
-	local coords = {}
-	for y=0,tm.y-1 do
-		for x=0,tm.x-1 do
-			local p = vec2:new(x,y)
-			local ms = mget(p)
-			if(ms == s) then
-				add(coords,p)
-			end
-		end
-	end
-
-	return coords
-end
-
---spawner
---replaces sprites in the map
---with their object
---counterpart
--------------------------------
-spawner=obj:subclass({
-	name="spawner",
-	objs=nil
-})
-
-function spawner:init()
-	prim.init(self)
-
-	self.objs = self.objs or {}
-
-	for obj in all(self.objs) do
-		local ps = map_find_sprites(obj.s)
-		for p in all(ps) do
-			mset(p, 0)
-			col.map_geo[p.y+1][p.x+1]={}
-
-			obj.o:new(obj.p,{
-				trs = trs:new((p*8)+4)
-			})
-		end
-	end
-end
-
---sprite
---sprite graphic
--------------------------------
-sprite=graphic:subclass({
-	name="sprite",
-	sz=nil,			--size
-	s=0																	--sprite
-})
-
-function sprite:init()
-	self.sz = self.sz or
-											vec2:new(1,1)
-end
-
-function sprite:g_draw()
-	if(not self.v) return
-	
-	spr(
-		self.s,
-		self:t().t,
-		self.sz
-	)
-	
-	graphic.g_draw(self)
-end
-
---actor
---dynamic primitive
--------------------------------
-actor=prim:subclass({
-	name="actor",
-	s=0,					--sprite
-	h=5,					--health
-	_sc=nil,	--sprite component
-	_geo=nil,	--geometry
-})
-
-function actor:init()
-	prim.init(self)
-
-	self._sc=sprite:new(self,{
-		trs=trs:new(vec2:new(-4,-4)),
-		s=self.s
-	})
-	self._geo = col.sprite_geo[self.s]
-end
-
-function actor:damage(d)
-	self.h -= d
-	if self.h <= 0 then
-		self.die()
-	end
-end
-
-function actor:die()
-	self.destroy()
-end
 
 --move
 --object for moving a parent
 -------------------------------
-move=obj:subclass({
+move=obj:extend({
 	name="move",
 	dp=nil,
 	geo=nil
@@ -2293,10 +1950,27 @@ function move:collision(r)
 	self.parent.trs.t += r.n * r.pd
 end
 
+--time
+--wrapper for keyboard input
+-------------------------------
+time = {
+	name="time",
+	dt=nil
+}
+
+function time:pre_update()
+	if self.dt == nil then
+		self.dt=1/t_fpstarget()
+		engine:remove_module(self)
+	end
+end
+
+engine:add_module(time)
+
 --octo_move
 --8-way move
 -------------------------------
-octo_move=move:subclass({
+octo_move=move:extend({
 	name="8-way move",
 	v=nil,									--velocity
 	mv=80,									--max velocity
@@ -2357,7 +2031,7 @@ end
 --trail
 --line strip trail effect
 -------------------------------
-trail=graphic:subclass({
+trail=graphic:extend({
 	name="trail",
 	cs={12,13,1}, --colors
 	ld=16,								--line divisions
@@ -2408,7 +2082,7 @@ end
 --cam
 --primitive to control camera
 -------------------------------
-camera=prim:subclass({
+camera=prim:extend({
 	name="camera",
 	min=nil,
 	max=nil
@@ -2432,7 +2106,7 @@ end
 --proj_move
 --projectile move
 -------------------------------
-proj_move=obj:subclass({
+proj_move=move:extend({
 	name="projectile move",
 	a=0,
 	s=80
@@ -2449,10 +2123,48 @@ function proj_move:update()
 	move.update(self)
 end
 
+function map_sprite_at(p,max)
+	max=max or vec2:new(255,127)
+
+	if(p.x < 0 or
+				p.y < 0) then
+		return -1
+	end
+
+	local mp = mpos2tile(p)
+
+	if(mp.x > max.x or
+				mp.y > max.y) then
+		return -1
+	end
+
+	--fetch sprite from map
+	return mget(mp)
+end
+
+function map_contains(p,m)
+	m = m or 255
+	
+	local s = map_sprite_at(p)
+
+	if(s>0) then
+		local sp = sidx2pos(s)
+		local cm = fget(s)
+
+		if(band(m,cm) == 0) then
+			return false
+		end
+
+		return sget(sp+(p%8))>0
+	end
+
+	return false
+end
+
 --missile
 --homing projectile
 -------------------------------
-missile=prim:subclass({
+missile=prim:extend({
 	name="missile",
 	sa=0,					--start angle
 	ss=80,				--start speed
@@ -2501,7 +2213,7 @@ end
 --laser
 --reflective projectile
 -------------------------------
-laser=missile:subclass({
+laser=missile:extend({
 	name="laser"
 })
 
@@ -2516,16 +2228,20 @@ end
 --pko
 --player avatar
 -------------------------------
-pko=actor:subclass({
+pko=actor:extend({
 	name="pko",
-	s=1,
-	mc=nil,	--move component
-	tc=nil,	--trail component
-	cc=nil		--camera component
+	s=1,					--sprite
+	con=nil,	--controller
+	mc=nil,		--move component
+	tc=nil,		--trail component
+	cc=nil			--camera component
 })
 
 function pko:init()
 	actor.init(self)
+
+	self.con = self.con or
+												controller
 
 	self.mc=octo_move:new(self,{
 		geo=self._geo
@@ -2538,13 +2254,13 @@ function pko:init()
 end
 
 function pko:update()
-	self.mc.wv=controller.dpad
+	self.mc.wv=self.con.dpad
 
-	if(controller.ap) then
+	if(self.con.ap) then
 		self:burst(missile,16)
 	end
 
-	if(controller.bp) then
+	if(self.con.bp) then
 		self:burst(laser,16)
 	end
  
@@ -2566,7 +2282,7 @@ end
 --tree
 --destructible tree
 -------------------------------
-tut_sat=actor:subclass({
+tut_sat=actor:extend({
 	name="tutorial satellite",
 	s=2
 })
@@ -2574,40 +2290,59 @@ tut_sat=actor:subclass({
 --tree
 --destructible tree
 -------------------------------
-tree=actor:subclass({
+tree=actor:extend({
 	name="tree",
 	s=3
 })
 
---circle
---circle shape
+--controller
+--wrapper for pico8 gamepad
 -------------------------------
-circle=shape:subclass({
-	name="circle",
-	r=1,								   --radius
-})
+controller = {
+	name="controller",
+	p=0,							--player index
+	dpad=vec2:new(),
 
-function circle:draw_fill()
-	local t = self:t()
-	f_circ(
-		t.t,
-		self.r * max(t.s.x,t.s.y),
- 	self.fc
- )
+	a=false,			--a button
+	_la=false,	--last a button
+	ap=false,		--a pressed
+	
+	b=false,			--b button
+	_lb=false,	--last b button
+	bp=false			--b pressed
+}
+
+function controller:pre_update()
+	local wx = 0
+	if(btn(0,self.p)) wx -= 1
+	if(btn(1,self.p)) wx += 1
+
+	local wy = 0
+	if(btn(2,self.p)) wy -= 1
+	if(btn(3,self.p)) wy += 1
+
+	self.dpad.x = wx
+	self.dpad.y = wy
+
+	self._la = self.a
+	self.a=btn(4,self.p)
+	self.ap=self.a and not self._la
+
+	self._lb = self.b
+	self.b=btn(5,self.p)
+	self.bp=self.b and not self._lb
 end
 
-function circle:draw_stroke()
-	local t = self:t()
-	s_circ(
-		t.t,
-		self.r * max(t.s.x,t.s.y),
- 	self.sc
- )
-end
+engine:add_module(controller)
 --pko_game
 --game scene
 
-pko_game=scene:new({
+
+
+
+
+
+pko_game=obj:extend({
 	name="pko game",
 	bg=nil,
 
@@ -2616,44 +2351,39 @@ pko_game=scene:new({
 		player=nil,
 		missiles=nil
 	},
-	
-	l_pl=nil,
-	l_ms=nil,
-	
-	pnt_g=nil,
-	test=nil,
-	col_vis=nil
+
+	c_p1=nil
 })
 
 --initialization
 -------------------------------
 function pko_game:init()
-	scene.init(self)
+	obj.init(self)
 
 	--initial scene clear
-	clear:new(self.sg)
+	clear:new(self)
 
 	--background
-	self.bg=obj_map:new(self.sg,{
+	self.bg=obj_map:new(self,{
 		name="background"
 	})
 
 	--layers
 	local la=obj:new(
-		self.sg,{
+		self,{
 			name="layer: actors"
 		}
 	)
 	
 	local lp=obj:new(
-		self.sg,
+		self,
 		{
 			name="layer: player"
 		}
 	)
 	
 	local lm=obj:new(
-		self.sg,
+		self,
 		{
 			name="layer: missiles"
 		}
@@ -2665,7 +2395,7 @@ function pko_game:init()
 
 	--actors
 	spawner:new(
-		self.sg,{
+		self,{
 		objs={
 			{
 				s=1,
@@ -2684,24 +2414,113 @@ function pko_game:init()
 			}
 		}
 	})
+end
+worker = {
+	name="worker",
+	idx=0,
+	num=0,
+	cor=nil
+}
 
-	--debug ui
-	if(debug != nil) then
-		self.pnt_g=dot:new(engine._dev_ui.pw)
+function worker:new(cor)
+	self.__index = self
+	return setmetatable({
+		cor = cocreate(cor)
+	}, self)
+end
 
-		self.test=circle:new(
-			self.layers.player,{
-			trs=trs:new(vec2:new(32,32)),
-			r=8,
-			geo=geo:new(8)
-		})
+function worker:__tostr()
+	return self.name.." "..
+								self.idx.." / "..
+								self.num
+end
 
-		--dbg_map_col:new(self.sg)
+worker_sys = {
+	name = "worker_sys",
+	ts = 1,				--timeslice
+	_sws = {},	--sequential workers
+	_pws = {}		--parallel workers
+}
+
+function worker_sys:post_update()
+	local cs = #self._sws
+	local cp = #self._pws
+	if(cs == 0 and cp == 0) return
+	
+	while(t_cpu() < self.ts) do
+		self:update_s()
+		self:update_p()
 	end
 end
 
+function worker_sys:update_p()
+	for w in all(self._pws) do
+		if not self:update_w(w) then
+			del(self._pws, w)
+		end
+	end
+end
 
-engine:set_active_scene("pko game")
+function worker_sys:update_s()
+	local w = self._sws[1]
+	if w then
+		if not self:update_w(w) then
+			del(self._sws, w)
+		end
+	end
+end
+
+function worker_sys:update_w(w)
+	local cs = costatus(w.cor)
+	if cs != "dead" then
+		coresume(w.cor, w)
+		return true
+	end
+	return false
+end
+
+function worker_sys:run(cor,para)
+	para = para or true
+
+	local w = worker:new(cor)
+
+	local ws = self._sws
+	if(para) ws = self._pws
+	add(ws, w)
+	
+	return w
+end
+
+engine:add_module(worker_sys)
+
+
+
+engine.upd_root = pko_game
+
+
+worker_sys:run(function(self)
+	self.num = 100
+
+	for i=1,100 do
+		self.idx = i
+		yield()
+	end
+
+	log("done 1")
+end)
+
+worker_sys:run(function(self)
+	self.num = 300
+
+	for i=1000,1300 do
+		self.idx = i - 1000
+		yield()
+	end
+
+	log("done 2")
+end)
+
+
 __gfx__
 0000000007800e806000000d000b3000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 00000000e8c79182060ee0d000bb3300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
@@ -2786,7 +2605,7 @@ __map__
 0000000000000000000000000000000052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
-0000000000000000000000000000000052000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
+0000000000000000000000000000000052000000000000000000000000000000000000000303000303030003000000000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000052000000000000000000000000000000000040414141414141414141414200000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000052000000000000000000000000000000000050515151515151515151515200000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000
 0000000000000000000000000000000052000000000000000000000000000000000050515151515151515151515200000000000000000000000000000000005000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000

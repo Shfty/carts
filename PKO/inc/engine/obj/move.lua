@@ -1,10 +1,12 @@
 require("obj")
+require("map_find_sprites")
+require("map_isect")
 require("dbg_axis")
 
 --move
 --object for moving a parent
 -------------------------------
-move=obj:subclass({
+move=obj:extend({
 	name="move",
 	dp=nil,
 	geo=nil

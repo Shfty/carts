@@ -1,9 +1,10 @@
 require("move")
+require("time")
 
 --octo_move
 --8-way move
 -------------------------------
-octo_move=move:subclass({
+octo_move=move:extend({
 	name="8-way move",
 	v=nil,									--velocity
 	mv=80,									--max velocity

@@ -44,11 +44,5 @@ function trs:__tostr()
 end
 
 function trs.__concat(lhs,rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
+	return tostr(lhs)..tostr(rhs)
 end

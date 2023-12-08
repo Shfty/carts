@@ -1,10 +1,12 @@
 require("prim")
 require("proj_move")
+require("map_contains")
+require("time")
 
 --missile
 --homing projectile
 -------------------------------
-missile=prim:subclass({
+missile=prim:extend({
 	name="missile",
 	sa=0,					--start angle
 	ss=80,				--start speed

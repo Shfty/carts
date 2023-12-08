@@ -4,13 +4,13 @@ require("graphic")
 --graphic with
 --stroke/fill colors
 -------------------------------
-shape=graphic:subclass({
+shape=graphic:extend({
 	name="shape",
-	s=true,
-	sc=6,
-	f=true,
-	fc=7,
-	cm=255
+	s=true,							--stroke
+	sc=6,									--stroke color
+	f=true,							--fill
+	fc=7,									--fill color
+	cm=255								--collision mask
 })
 
 function shape:g_draw()

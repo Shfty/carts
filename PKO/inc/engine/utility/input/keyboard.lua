@@ -1,18 +1,25 @@
-require("input")
+require("devkit_input")
 
---controller
+--keyboard
 --wrapper for keyboard input
 -------------------------------
 kb = {
-	kp=nil,
-	kc=nil
+	name="keyboard",
+	kp=nil
 }
 
-function kb:update()
-	self.kp=stat(30)
-	self.kc=stat(31)
+function kb:pre_update()
+	self.kp = {}
+	while stat(30) do
+		add(self.kp, stat(31))
+	end
 end
 
 function kb:keyp(char)
-	return self.kp and self.kc == char
+	for k in all(self.kp) do
+		if(k == char) return true
+	end
+	return false
 end
+
+engine:add_module(kb)

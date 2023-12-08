@@ -4,7 +4,7 @@ require("trs")
 --primitive
 --object with transform
 -------------------------------
-prim=obj:subclass({
+prim=obj:extend({
 	name="primitive",
 	trs=nil											--transform
 })

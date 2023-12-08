@@ -1,11 +1,12 @@
 --debug game
 --debugging scene
-require("scene")
+require("obj")
 require("clear")
 require("poly")
-require("dot")
+require("camera")
+require("sprite")
 
-debug_game=scene:new({
+debug_game=obj:extend({
 	name="debug game",
 	cp_axis=nil,
 	pd_axis=nil
@@ -14,17 +15,17 @@ debug_game=scene:new({
 --initialization
 -------------------------------
 function debug_game:init()
-	scene.init(self)
+	obj.init(self)
 
 	--initial scene clear
-	clear:new(self.sg)
-	camera:new(self.sg,{
+	clear:new(self)
+	camera:new(self,{
 		trs=trs:new(vec2:new(64,64))
 	})
 
 	--debug ui
 	if(debug != nil) then
-		sprite:new(self.sg,{
+		sprite:new(self,{
 			trs=trs:new(
 				vec2:new(32,64)-4,
 				0,
@@ -33,7 +34,7 @@ function debug_game:init()
 			s=1
 		})
 
-		poly:fromsprite(self.sg,1,{
+		poly:fromsprite(self,1,{
 			trs=trs:new(
 				vec2:new(32,64),
 				0,

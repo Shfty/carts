@@ -188,16 +188,10 @@ function vec2:lerp(tgt,d)
 end
 
 function vec2:__tostr()
-	return "x:"..self.x..
+	return "vec2 x:"..self.x..
 	",y:"..self.y
 end
 
 function vec2.__concat(lhs,rhs)
-	if(type(lhs)=="table") then
-		return lhs:__tostr()..rhs
-	end
-
-	if(type(rhs)=="table") then
-		return lhs..rhs:__tostr()
-	end
+	return tostr(lhs)..tostr(rhs)
 end

@@ -1,9 +1,10 @@
 require("shape")
+require("sprite_geo")
 
 --poly
 --n-sided shape
 -------------------------------
-poly=shape:subclass({
+poly=shape:extend({
 	name="poly",
 	vs=nil							--vertices
 })
@@ -15,10 +16,13 @@ end
 
 function poly:fromsprite(p,s,t)
 	t = t or {}
-	t.geo=col.sprite_geo[s]
-	assert(t.geo)
+	t.geo=sprite_geo.geo[s]
 	t.cm=fget(s)
 	return poly:new(p,t)
+end
+
+function poly:g_cull(sp)
+	return false
 end
 
 function poly:draw_stroke()

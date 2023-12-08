@@ -1,10 +1,11 @@
 require("prim")
-require("drawstate")
+require("ds_camera")
+require("mouse")
 
 --pointer
 --mouse pointer
 -------------------------------
-pointer=prim:subclass({
+pointer=prim:extend({
 	name="pointer"
 })
 
@@ -15,5 +16,5 @@ end
 
 function pointer:update()
 	prim.update(self)
-	self.trs.t = drawstate:campos() + mouse.mp
+	self.trs.t = ds_camera() + mouse.mp
 end
